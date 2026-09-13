@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>06 · 网络 · k8s-cliche</title>
+<meta name="description" content="Pod 互通、Service 四种类型、流量路径、CoreDNS 解析链路、Ingress 与 NetworkPolicy。">
+<script>
+(function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+</script>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23326ce5' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23326ce5'/%3E%3C/svg%3E">
+</head>
+<body data-page="06">
+<a class="skip-link" href="#top">跳到正文</a>
+<div id="progress"></div>
+
+<header class="topbar">
+  <button class="icon-btn" id="navToggle" type="button" aria-label="打开目录">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+  </button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" style="color:var(--accent)">
+        <circle cx="32" cy="32" r="24" stroke-width="4"/>
+        <circle cx="32" cy="32" r="6" fill="currentColor" stroke="none"/>
+        <g stroke-width="4" stroke-linecap="round">
+          <line x1="32" y1="26" x2="32" y2="8"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(51.43 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(102.86 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(154.29 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(205.71 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(257.14 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(308.57 32 32)"/>
+        </g>
+      </svg>
+    </span>
+    k8s-cliche
+  </a>
+  <span class="topbar-chapter"></span>
+  <div class="topbar-spacer"></div>
+  <button class="icon-btn" id="themeToggle" type="button" title="切换深色 / 浅色主题" aria-label="切换主题">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4.5"/>
+      <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/>
+    </svg>
+  </button>
+</header>
+
+<div class="nav-scrim"></div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar" aria-label="章节目录">
+    <nav id="sidebarNav"></nav>
+  </aside>
+
+  <main class="main" id="top">
+    <article class="content">
+      <span class="chapter-eyebrow">专题 · 第 06 章</span>
+      <h1>网络</h1>
+      <p class="lede">K8s 网络 = 三个问题：Pod 之间怎么通、外面怎么进来、名字怎么解析。</p>
+
+      <div class="tldr">
+        <div class="tldr-label">一句话答案</div>
+        <p>K8s 网络模型的基本假设：<strong>每个 Pod 有自己的 IP，Pod 之间无需 NAT 直接互通</strong>（由 CNI 插件实现）；<strong>Service</strong> 给一组 Pod 一个稳定虚拟 IP；<strong>CoreDNS</strong> 给 Service 一个稳定名字。</p>
+        <p>三层答案：CNI 管 Pod 互通，Service/Ingress 管入口，CoreDNS 管名字。</p>
+      </div>
+
+      <h2 id="pod-network">Pod 间互通：CNI 模型</h2>
+      <p>K8s 只规定网络<strong>模型</strong>，不规定实现。模型要求：</p>
+      <ul>
+        <li>每个 Pod 拿到集群内唯一的 IP</li>
+        <li>任意两个 Pod 可以直接通信（跨节点也一样），不需要 NAT</li>
+        <li>节点与 Pod 之间也可以直接通信</li>
+      </ul>
+      <p>实现这套模型的是 <strong>CNI 插件</strong>：Flannel（overlay 简单方案）、Calico（BGP/iptables，支持 NetworkPolicy）、Cilium（eBPF 数据路径）。IP 在 Pod 沙箱创建时分配（第 03 章 ⑤）。</p>
+      <p>同 Pod 内的容器共享沙箱网络：同一个 IP、互用 <code>localhost</code>、端口不能冲突——把它们想成同一台「小机器」上的进程。</p>
+
+      <h2 id="service">Service：给易变的 Pod 一个不变的入口</h2>
+      <p>Pod 会死会重建、IP 每次都变。Service 用<strong>选择器</strong>圈住一组 Pod，对外提供稳定的虚拟 IP（ClusterIP）和 DNS 名。</p>
+
+      <h3 id="svc-types">四种类型</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>类型</th><th>暴露范围</th><th>机制</th></tr></thead>
+          <tbody>
+            <tr><td><strong>ClusterIP</strong>（默认）</td><td>仅集群内</td><td>虚拟 IP + 内核转发规则</td></tr>
+            <tr><td><strong>NodePort</strong></td><td>集群外，经任意节点 IP</td><td>在 ClusterIP 基础上，每个节点开一个固定端口（默认 30000-32767）</td></tr>
+            <tr><td><strong>LoadBalancer</strong></td><td>集群外，经云厂商 LB</td><td>在 NodePort 基础上，向云申请外部负载均衡器</td></tr>
+            <tr><td><strong>ExternalName</strong></td><td>—</td><td>不做转发，只是 DNS CNAME 到外部域名</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>另有 <strong>headless Service</strong>（<code>clusterIP: None</code>）：不分配虚拟 IP，DNS 直接返回后端 Pod 的 IP 列表。StatefulSet 靠它给每个 Pod 独立域名（<code>web-0.web.default.svc.cluster.local</code>）。</p>
+
+      <h3 id="svc-path">流量路径：kube-proxy 不在路上</h3>
+      <figure class="diagram" id="fig-svc-path">
+        <div class="diagram-canvas-wrap"></div>
+        <figcaption class="diagram-caption"><b>ClusterIP 的流量路径</b>：虚拟 IP 只存在于内核规则里；kube-proxy 只写规则，不碰数据包（第 02 章）</figcaption>
+      </figure>
+      <p>访问 ClusterIP 的包到达节点后，被内核的 netfilter（iptables 模式）或 IPVS 表做 DNAT，改写成某个后端 Pod 的 IP:Port 后直接发出。<strong>没有任何用户态进程经手这个包。</strong></p>
+
+      <h2 id="dns">DNS：名字怎么变成 IP</h2>
+      <p>CoreDNS 为每个 Service 创建记录：</p>
+      <div class="code-block" data-lang="bash">
+<pre><code># 完整域名（任何 namespace 内都可用）
+web.default.svc.cluster.local
+
+# 同 namespace 可简写
+web
+
+# 跨 namespace
+web.default</code></pre>
+      </div>
+      <ul>
+        <li>普通 Service：A 记录指向 <strong>ClusterIP</strong></li>
+        <li>headless Service：A 记录直接指向<strong>各 Ready Pod 的 IP</strong></li>
+        <li>解析失败的高频原因不是 CoreDNS 挂了，而是 <code>ndots:5</code> 与 search 域导致的解析顺序问题——先用完整域名验证</li>
+      </ul>
+
+      <h2 id="ingress">Ingress：七层入口</h2>
+      <p>NodePort/LoadBalancer 都是四层（IP:Port）。要按<strong>域名和路径</strong>路由（<code>api.example.com → api 服务</code>、<code>/web → web 服务</code>），需要七层——Ingress。</p>
+      <ul>
+        <li><strong>Ingress 对象</strong>：一组路由规则的声明</li>
+        <li><strong>Ingress 控制器</strong>：真正干活的进程（nginx-ingress、traefik……），watch Ingress 对象并更新自己的路由配置</li>
+        <li>控制器自己通常以 Deployment + <strong>LoadBalancer Service</strong> 暴露——七层建立在四层之上</li>
+      </ul>
+      <p>TLS 终止也在这里：Secret 里放证书，Ingress 规则引用它。</p>
+
+      <h2 id="networkpolicy">NetworkPolicy：Pod 间防火墙</h2>
+      <p>默认情况下集群内所有 Pod 互通——<strong>默认放行</strong>。NetworkPolicy 按标签选择 Pod，声明允许谁（from）以哪些端口（ports）访问它（ingress），或它允许访问谁（egress）。</p>
+      <div class="callout warn">
+        <div class="callout-title">两个关键点</div>
+        <p>① <strong>一旦有任一策略选中某 Pod，该 Pod 未声明的方向即变为拒绝</strong>——默认放行变成默认拒绝，是按 Pod 逐个翻转的。② 策略要生效，CNI 插件必须支持（Flannel 不支持，Calico/Cilium 支持）。</p>
+      </div>
+
+      <h2 id="interview">面试官视角</h2>
+      <p><strong>Q：ClusterIP、NodePort、LoadBalancer 的区别？</strong></p>
+      <div class="answer-compare">
+        <div class="answer bad">
+          <div class="answer-head">✕ 平庸答案</div>
+          <div class="answer-body"><p>「ClusterIP 集群内访问，NodePort 开端口，LoadBalancer 用云负载均衡。」</p><p>——对但薄。缺机制、缺叠加关系。</p></div>
+        </div>
+        <div class="answer good">
+          <div class="answer-head">✓ 加分答案 · 叠加关系 + 数据路径</div>
+          <div class="answer-body"><p>「三者是叠加关系：ClusterIP 是基础，一个只存在于内核转发规则里的虚拟 IP；NodePort 在它之上让每个节点监听一个固定端口；LoadBalancer 再在 NodePort 之上向云申请外部 LB。数据路径上三者都最终落到内核的 DNAT 规则，kube-proxy 只负责维护规则不在路径上。生产上对外入口更常用 Ingress 或 Gateway API，在七层做路由，避免为每个服务开一个 LB。」</p></div>
+        </div>
+      </div>
+      <p><strong>Q：Pod 之间怎么通信？</strong>——答模型不答实现：每 Pod 独立 IP、扁平网络、无 NAT；实现交给 CNI（overlay / 路由 / eBGP / eBPF 各流派一句带过）；同 Pod 内容器共享沙箱网络。</p>
+
+      <h2 id="myths">常见误区</h2>
+      <div class="myth">
+        <div class="myth-q">误区一：ClusterIP 是一个「真实存在」的 IP</div>
+        <p class="myth-a">没有任何网卡持有它。它只存在于每个节点的内核规则里，ping 不通是常态（除非规则恰好响应）。</p>
+      </div>
+      <div class="myth">
+        <div class="myth-q">误区二：Service 不通先查 Service 配置</div>
+        <p class="myth-a">先 <code>kubectl get endpoints</code>。后端为空（Pod 没 Ready / 标签没对上）远比 Service 配错常见。</p>
+      </div>
+      <div class="myth">
+        <div class="myth-q">误区三：装了 K8s 就有 NetworkPolicy</div>
+        <p class="myth-a">对象 API 存在 ≠ 生效。Flannel 等插件会接受对象但完全不执行。选型时就要确认。</p>
+      </div>
+
+      <h2 id="further">延伸</h2>
+      <ul>
+        <li><a href="https://kubernetes.io/docs/concepts/services-networking/" rel="noopener">官方文档 · Services and Networking</a></li>
+        <li>网络在 Pod 诞生中的位置：<a href="03-birth-of-a-pod.html">03 · 一个 Pod 的诞生</a> ⑤⑦ 两站</li>
+      </ul>
+
+      <div class="mark-done">
+        <button type="button" data-chapter="06">读完本章，打个卡</button>
+      </div>
+
+      <nav class="chapter-nav" id="chapterNav" aria-label="章节导航"></nav>
+    </article>
+
+    <aside class="page-toc" id="pageToc" aria-label="本页目录"></aside>
+  </main>
+</div>
+
+<script src="assets/site.js"></script>
+<script src="assets/diagram.js"></script>
+<script src="assets/main.js"></script>
+<script>
+/* 06 章 · ClusterIP 流量路径 */
+K8C.Diagram.mount('#fig-svc-path', {
+  width: 900, height: 280,
+  nodes: [
+    { id:'client', x:90,  y:90, w:130, h:50, label:'客户端 Pod', sub:'发起访问' },
+    { id:'svc',    x:320, y:90, w:170, h:54, label:'Service', sub:'ClusterIP 10.96.x.x', kind:'hub' },
+    { id:'kernel', x:570, y:90, w:180, h:54, label:'内核转发规则', sub:'iptables / IPVS · DNAT' },
+    { id:'p1',     x:810, y:50, w:120, h:44, label:'Pod 1', sub:'10.244.1.7:8080', color:'ok' },
+    { id:'p2',     x:810, y:130, w:120, h:44, label:'Pod 2', sub:'10.244.2.9:8080', color:'ok' },
+    { id:'kproxy', x:570, y:220, w:180, h:48, label:'kube-proxy', sub:'规则维护员', kind:'ghost' }
+  ],
+  edges: [
+    { from:'client', to:'svc',    label:'访问虚拟 IP' },
+    { from:'svc',    to:'kernel', label:'命中规则' },
+    { from:'kernel', to:'p1',     label:'DNAT' },
+    { from:'kernel', to:'p2',     label:'DNAT' },
+    { from:'kproxy', to:'kernel', label:'只写规则，不在数据路径', kind:'dashed' }
+  ]
+});
+
+</script>
+</body>
+</html>

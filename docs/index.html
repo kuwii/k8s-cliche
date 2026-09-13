@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>k8s-cliche · 快速建立 Kubernetes 的整体认知</title>
+<meta name="description" content="一份写给初学者与面试者的 Kubernetes 入门纲领：它是什么、干什么用的、分成哪几块、怎么协作。先有地图，再按需深入。">
+<script>
+(function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+</script>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23326ce5' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23326ce5'/%3E%3C/svg%3E">
+</head>
+<body data-page="index" class="no-sidebar">
+<a class="skip-link" href="#top">跳到正文</a>
+<div id="progress"></div>
+
+<header class="topbar">
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" style="color:var(--accent)">
+        <circle cx="32" cy="32" r="24" stroke-width="4"/>
+        <circle cx="32" cy="32" r="6" fill="currentColor" stroke="none"/>
+        <g stroke-width="4" stroke-linecap="round">
+          <line x1="32" y1="26" x2="32" y2="8"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(51.43 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(102.86 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(154.29 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(205.71 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(257.14 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(308.57 32 32)"/>
+        </g>
+      </svg>
+    </span>
+    k8s-cliche
+  </a>
+  <div class="topbar-spacer"></div>
+  <button class="icon-btn" id="themeToggle" type="button" title="切换深色 / 浅色主题" aria-label="切换主题">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4.5"/>
+      <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/>
+    </svg>
+  </button>
+</header>
+
+<main class="main" id="top">
+  <div>
+
+    <!-- Hero -->
+    <section class="hero">
+      <svg class="hero-logo" viewBox="0 0 64 64" fill="none" stroke="currentColor" style="color:var(--accent)" aria-hidden="true">
+        <circle cx="32" cy="32" r="24" stroke-width="3.4"/>
+        <circle cx="32" cy="32" r="6" fill="currentColor" stroke="none"/>
+        <g stroke-width="3.4" stroke-linecap="round">
+          <line x1="32" y1="26" x2="32" y2="8"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(51.43 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(102.86 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(154.29 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(205.71 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(257.14 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(308.57 32 32)"/>
+        </g>
+      </svg>
+      <h1>先有地图，<br>再进丛林。</h1>
+      <p class="tagline">
+        Kubernetes 是一个巨大而复杂的系统。这个项目只做一件事：<br>
+        让你用最短时间明白它<em>是什么</em>、<em>干什么用的</em>、<em>分成哪几块</em>、<em>怎么协作</em>。<br>
+        有了这张纲领，之后的任何深入，你都知道自己站在哪。
+      </p>
+      <div class="hero-stats">
+        <div class="hero-stat"><div class="v">4</div><div class="k">主线章节 · 约 1 小时</div></div>
+        <div class="hero-stat"><div class="v">9</div><div class="k">专题章节 · 按需展开</div></div>
+        <div class="hero-stat"><div class="v" id="statDone">0 / 1</div><div class="k">我的阅读进度</div></div>
+      </div>
+    </section>
+
+    <!-- 适合谁 -->
+    <section class="home-section">
+      <h2>适合谁</h2>
+      <p class="sub">两类读者共用同一份正文：正文讲原理，章末给话术。</p>
+      <div class="reader-grid">
+        <div class="reader-card">
+          <h3><span class="reader-icon">🌱</span>初学者</h3>
+          <p>按顺序读完「主线」四章。目标是<strong>理解</strong>，不是记忆。K8s 的核心概念其实很少，对象只是同一套思想在不同场景下的具体化——这个项目先给你思想，再带你看对象。</p>
+        </div>
+        <div class="reader-card">
+          <h3><span class="reader-icon">🎯</span>面试者</h3>
+          <p>直接跳各章末尾的<strong>「面试官视角」</strong>与<strong>「常见误区」</strong>。理解力和表达力是两回事，很多人懂但答得平庸——这里给出「烂大街答案 vs 加分答案」的对照。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 章节（由 site.js 渲染） -->
+    <div id="homeChapters"></div>
+    <noscript>
+      <section class="home-section">
+        <h2>章节</h2>
+        <p class="sub">需要启用 JavaScript 以渲染完整目录。当前可直接访问：</p>
+        <ul>
+          <li><a href="00-mental-models.html">00 · 心智模型</a></li>
+        </ul>
+      </section>
+    </noscript>
+
+    <!-- 写作约定 -->
+    <section class="home-section">
+      <h2>写作约定</h2>
+      <p class="sub">每章固定结构，术语跟随中文社区实际语感。</p>
+      <div class="reader-grid">
+        <div class="reader-card">
+          <h3><span class="reader-icon">🧱</span>每章的固定结构</h3>
+          <p>一句话答案（30 秒版）→ 为什么需要它（动机）→ 核心概念（原理）→ 怎么工作（机制 + 图）→ 面试官视角 → 常见误区 → 延伸（指向官方文档，不在此展开）。</p>
+        </div>
+        <div class="reader-card">
+          <h3><span class="reader-icon">🈶</span>术语处理</h3>
+          <p>中文为主、括号标英文：节点（Node）、调度器（Scheduler）；社区惯用英文的保留英文：Pod、Deployment、Service；组件名直接用：kubelet、etcd、kube-proxy。Pod 官方译名「容器组」几乎无人使用，故从社区习惯。</p>
+        </div>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <a href="index.html">k8s-cliche</a>
+      <span class="sep">·</span>
+      内容以 <a href="https://creativecommons.org/licenses/by/4.0/deed.zh-hans" rel="noopener">CC-BY 4.0</a> 许可发布
+    </footer>
+
+  </div>
+</main>
+
+<script src="assets/site.js"></script>
+<script src="assets/diagram.js"></script>
+<script src="assets/main.js"></script>
+</body>
+</html>

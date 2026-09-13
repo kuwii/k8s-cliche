@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>11 · 扩展机制 · k8s-cliche</title>
+<meta name="description" content="CRD、Operator、Informer 控制循环、准入 Webhook——K8s 如何被扩展。">
+<script>
+(function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+</script>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23326ce5' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23326ce5'/%3E%3C/svg%3E">
+</head>
+<body data-page="11">
+<a class="skip-link" href="#top">跳到正文</a>
+<div id="progress"></div>
+
+<header class="topbar">
+  <button class="icon-btn" id="navToggle" type="button" aria-label="打开目录">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+  </button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" style="color:var(--accent)">
+        <circle cx="32" cy="32" r="24" stroke-width="4"/>
+        <circle cx="32" cy="32" r="6" fill="currentColor" stroke="none"/>
+        <g stroke-width="4" stroke-linecap="round">
+          <line x1="32" y1="26" x2="32" y2="8"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(51.43 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(102.86 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(154.29 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(205.71 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(257.14 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(308.57 32 32)"/>
+        </g>
+      </svg>
+    </span>
+    k8s-cliche
+  </a>
+  <span class="topbar-chapter"></span>
+  <div class="topbar-spacer"></div>
+  <button class="icon-btn" id="themeToggle" type="button" title="切换深色 / 浅色主题" aria-label="切换主题">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4.5"/>
+      <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/>
+    </svg>
+  </button>
+</header>
+
+<div class="nav-scrim"></div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar" aria-label="章节目录">
+    <nav id="sidebarNav"></nav>
+  </aside>
+
+  <main class="main" id="top">
+    <article class="content">
+      <span class="chapter-eyebrow">专题 · 第 11 章</span>
+      <h1>扩展机制</h1>
+      <p class="lede">K8s 的扩展性不是特性列表，是三句话：加资源、加控制器、加关卡。</p>
+
+      <div class="tldr">
+        <div class="tldr-label">一句话答案</div>
+        <p>三种扩展点：<strong>CRD</strong> 注册新资源类型（数据面扩展），<strong>Operator = CRD + 控制器</strong>（把运维知识编码成控制循环），<strong>Admission Webhook</strong> 在请求路径上加自定义关卡（策略面扩展）。</p>
+        <p>它们复用的全是内置组件的同款机制——这正是第 00 章「一切皆资源」的红利。</p>
+      </div>
+
+      <h2 id="crd">CRD：往 API 里注册新资源</h2>
+      <p>CustomResourceDefinition 让你定义自己的资源类型，比如 <code>MySQLCluster</code>。注册后：</p>
+      <ul>
+        <li><code>kubectl get mysqlclusters</code> 立刻可用——因为 kubectl 操作的是「资源」这个抽象，不关心内置与否</li>
+        <li>对象存进 etcd、有 spec/status、能被 watch——<strong>全套机制免费获得</strong></li>
+      </ul>
+      <div class="callout note">
+        <div class="callout-title">CRD 只是数据</div>
+        <p>只有 CRD 没有控制器时，你写的 <code>MySQLCluster</code> 对象躺在 etcd 里<strong>什么都不会发生</strong>。让它「活」起来的是控制器。</p>
+      </div>
+
+      <h2 id="operator">Operator：CRD + 控制器</h2>
+      <p><strong>Operator = 自定义资源 + 一个 watch 它并执行调谐的控制器</strong>。它把「DBA 的手艺」变成代码：创建 MySQLCluster 时自动起主从、配复制、做备份、故障切换。</p>
+      <p>典型例子：Prometheus Operator（声明 Prometheus 资源即部署监控）、cert-manager（声明 Certificate 即自动签证书续期）。</p>
+
+      <h2 id="informer">控制器是怎么写的：Informer 模式</h2>
+      <figure class="diagram" id="fig-controller">
+        <div class="diagram-canvas-wrap"></div>
+        <figcaption class="diagram-caption"><b>控制器的标准结构</b>：Informer 维护本地缓存并推送变更，WorkQueue 去重缓冲，Reconcile 读缓存做决策写回</figcaption>
+      </figure>
+      <ul>
+        <li><strong>Informer</strong>：对 API Server 做 List-Watch——先全量列一次建本地缓存，之后增量接收变更事件。控制器读的是<strong>本地缓存</strong>，不打 API Server</li>
+        <li><strong>WorkQueue</strong>：事件入队、去重、限速、失败重试。同一个对象短时间变更十次，队列里只处理一次最新</li>
+        <li><strong>Reconcile</strong>：从队列取 key，读期望与实际，做最小动作写回——就是第 00 章那个循环的工程形态</li>
+      </ul>
+      <p>工具链定位：<code>client-go</code> 是底层库；<code>controller-runtime</code> 把 Informer/Queue/Manager 打包成易用抽象；<code>kubebuilder</code> / <code>operator-sdk</code> 是脚手架，生成 CRD 清单与控制器骨架。</p>
+
+      <h2 id="webhook">Admission Webhook：请求路径上的自定义关卡</h2>
+      <p>第 03 章 ① 站的准入阶段，除了内置逻辑，还可以调用<strong>你部署的 HTTPS 服务</strong>：</p>
+      <ul>
+        <li><strong>Mutating Webhook</strong>：可改写请求——自动注入 sidecar、补默认标签、拒绝+改写镜像来源</li>
+        <li><strong>Validating Webhook</strong>：只裁决接受/拒绝——「生产 namespace 必须带 owner 标签」「limits 必须设置」这类组织策略</li>
+      </ul>
+      <p>OPA Gatekeeper / Kyverno 就是「策略即数据」的通用 webhook 实现：策略写成声明式对象，不必为每条规则写代码。</p>
+
+      <h2 id="when-operator">什么时候才需要写 Operator</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>场景</th><th>正确工具</th></tr></thead>
+          <tbody>
+            <tr><td>部署一个普通应用</td><td>Deployment + Service，别写 Operator</td></tr>
+            <tr><td>组织级准入策略</td><td>Validating Webhook / Kyverno</td></tr>
+            <tr><td>应用有<strong>运维状态机</strong>：主从切换、备份、扩缩需要领域知识</td><td>Operator</td></tr>
+            <tr><td>管理<strong>集群外部</strong>资源（云数据库、DNS 记录）</td><td>Operator（控制器完全可以操作外部系统）</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="interview">面试官视角</h2>
+      <p><strong>Q：什么是 Operator？/ Informer 的工作原理？</strong></p>
+      <div class="answer-compare">
+        <div class="answer bad">
+          <div class="answer-head">✕ 平庸答案</div>
+          <div class="answer-body"><p>「Operator 就是管理应用的控制器。」</p><p>——同义反复。没说出 CRD、没说出调谐循环、没说出它和内置控制器的同构性。</p></div>
+        </div>
+        <div class="answer good">
+          <div class="answer-head">✓ 加分答案</div>
+          <div class="answer-body"><p>「Operator 是 CRD 加控制器的组合：CRD 把领域对象（如 MySQLCluster）变成 K8s 资源，控制器 watch 它并执行调谐循环，把运维知识——主从搭建、备份、故障切换——编码成代码。实现上靠 Informer 模式：List-Watch 建本地缓存，事件进 WorkQueue 去重，Reconcile 函数读缓存做最小变更写回。它和 Deployment 控制器用的是完全相同的机制，只是资源类型换成了自定义的。」</p></div>
+        </div>
+      </div>
+
+      <h2 id="myths">常见误区</h2>
+      <div class="myth">
+        <div class="myth-q">误区一：写了 CRD 就等于有了功能</div>
+        <p class="myth-a">CRD 只注册了数据类型。没有控制器，对象只是 etcd 里的静态记录。</p>
+      </div>
+      <div class="myth">
+        <div class="myth-q">误区二：watch 是轮询</div>
+        <p class="myth-a">watch 是服务端推送的长连接。List 只发生一次（及断线重连/周期性 resync），稳态流量是增量事件流。</p>
+      </div>
+      <div class="myth">
+        <div class="myth-q">误区三：Operator 只能管集群内资源</div>
+        <p class="myth-a">控制器就是普通程序，完全可以调用云 API、操作外部数据库。「用 K8s API 管理云资源」正是 Operator 的高价值场景。</p>
+      </div>
+
+      <h2 id="further">延伸</h2>
+      <ul>
+        <li><a href="https://kubernetes.io/docs/concepts/extend-kubernetes/" rel="noopener">官方文档 · Extending Kubernetes</a></li>
+        <li><a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/" rel="noopener">官方文档 · Dynamic Admission Control</a></li>
+        <li>控制循环的思想源头：<a href="00-mental-models.html">00 · 心智模型</a> 模型一</li>
+      </ul>
+
+      <div class="mark-done">
+        <button type="button" data-chapter="11">读完本章，打个卡</button>
+      </div>
+
+      <nav class="chapter-nav" id="chapterNav" aria-label="章节导航"></nav>
+    </article>
+
+    <aside class="page-toc" id="pageToc" aria-label="本页目录"></aside>
+  </main>
+</div>
+
+<script src="assets/site.js"></script>
+<script src="assets/diagram.js"></script>
+<script src="assets/main.js"></script>
+<script>
+/* 11 章 · 控制器标准结构 */
+K8C.Diagram.mount('#fig-controller', {
+  width: 880, height: 200,
+  nodes: [
+    { id:'api', x:760, y:90, w:150, h:54, label:'API Server', kind:'hub' },
+    { id:'inf', x:120, y:90, w:170, h:54, label:'Informer', sub:'List-Watch + 本地缓存' },
+    { id:'wq',  x:360, y:90, w:140, h:54, label:'WorkQueue', sub:'去重 / 限速 / 重试' },
+    { id:'rec', x:560, y:90, w:150, h:54, label:'Reconcile', sub:'你的调谐逻辑', color:'accent' }
+  ],
+  edges: [
+    { from:'api', to:'inf', label:'watch 推送变更', bow: -62, labelDy: -12 },
+    { from:'inf', to:'wq',  label:'事件入队' },
+    { from:'wq',  to:'rec', label:'出队处理' },
+    { from:'rec', to:'api', label:'写回结果', bow: 14, labelDx:-14 }
+  ],
+  notes: [
+    { x:440, y:180, text:'读走本地缓存，写走 API Server —— 与内置控制器同构', color:'mute' }
+  ]
+});
+
+</script>
+</body>
+</html>

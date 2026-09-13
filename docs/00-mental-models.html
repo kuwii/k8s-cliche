@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>00 · 心智模型 · k8s-cliche</title>
+<meta name="description" content="K8s 的四条核心心智模型：声明式与控制循环、一切皆资源、标签与选择器、中心辐射架构。">
+<script>
+(function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+</script>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23326ce5' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23326ce5'/%3E%3C/svg%3E">
+</head>
+<body data-page="00">
+<a class="skip-link" href="#top">跳到正文</a>
+<div id="progress"></div>
+
+<header class="topbar">
+  <button class="icon-btn" id="navToggle" type="button" aria-label="打开目录">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+  </button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" style="color:var(--accent)">
+        <circle cx="32" cy="32" r="24" stroke-width="4"/>
+        <circle cx="32" cy="32" r="6" fill="currentColor" stroke="none"/>
+        <g stroke-width="4" stroke-linecap="round">
+          <line x1="32" y1="26" x2="32" y2="8"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(51.43 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(102.86 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(154.29 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(205.71 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(257.14 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(308.57 32 32)"/>
+        </g>
+      </svg>
+    </span>
+    k8s-cliche
+  </a>
+  <span class="topbar-chapter"></span>
+  <div class="topbar-spacer"></div>
+  <button class="icon-btn" id="themeToggle" type="button" title="切换深色 / 浅色主题" aria-label="切换主题">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4.5"/>
+      <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/>
+    </svg>
+  </button>
+</header>
+
+<div class="nav-scrim"></div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar" aria-label="章节目录">
+    <nav id="sidebarNav"></nav>
+  </aside>
+
+  <main class="main" id="top">
+    <article class="content">
+
+      <span class="chapter-eyebrow">主线 · 第 00 章</span>
+      <h1>心智模型</h1>
+      <p class="lede">在记住任何 YAML 之前，先记住这四条。</p>
+
+      <div class="tldr">
+        <div class="tldr-label">一句话答案</div>
+        <p>Kubernetes 的全部设计建立在四个思想之上：<strong>声明式 + 控制循环</strong>、<strong>一切皆资源</strong>、<strong>标签解耦</strong>、<strong>中心辐射架构</strong>。</p>
+        <p>理解了这四条，K8s 里绝大多数对象和行为你都能自己推导出来，不需要背。</p>
+      </div>
+
+      <!-- ==================== 为什么 ==================== -->
+      <h2 id="why">为什么需要这一章</h2>
+      <p>K8s 的学习曲线陡峭，但陡峭的地方往往不在「难」，而在「反直觉」。</p>
+      <p>很多人学 K8s 的方式是逐个背对象：Pod 是什么、Service 是什么、Deployment 是什么……背到第十个就崩了，因为对象之间有微妙的关联，而死记硬背抓不住这些关联。</p>
+      <p>真实情况是：<strong>K8s 的核心概念很少，对象很多。</strong>对象只是同一套思想在不同场景下的具体化。所以正确的顺序是先拿到思想，再去认对象——那时候你会发现它们长得都很像。</p>
+
+      <div class="card-grid" style="margin-bottom:24px">
+        <div class="model-card">
+          <span class="model-num">模型一</span>
+          <h3>声明式 + 控制循环</h3>
+          <p>你描述期望，系统持续地让现实逼近期望。这是「自愈」的来源，是 K8s 的灵魂。</p>
+        </div>
+        <div class="model-card">
+          <span class="model-num">模型二</span>
+          <h3>一切皆资源</h3>
+          <p>所有东西都是带 spec / status 的 API 对象，用统一的 REST API 读写。</p>
+        </div>
+        <div class="model-card">
+          <span class="model-num">模型三</span>
+          <h3>标签与选择器</h3>
+          <p>对象之间没有从属关系，只有标签匹配。松耦合带来极强的灵活性。</p>
+        </div>
+        <div class="model-card">
+          <span class="model-num">模型四</span>
+          <h3>中心辐射架构</h3>
+          <p>组件彼此不直接通信，只围着 API Server 转，靠「监听」协作。</p>
+        </div>
+      </div>
+
+      <hr class="sep">
+
+      <!-- ==================== 模型一 ==================== -->
+      <h2 id="model-1">模型一：声明式 + 控制循环</h2>
+      <p>这是 K8s 的灵魂。</p>
+
+      <h3 id="imperative-vs-declarative">命令式 vs 声明式</h3>
+      <p><strong>命令式（Imperative）</strong>：你告诉系统<em>每一步怎么做</em>。</p>
+      <div class="code-block" data-lang="bash">
+<pre><code># 启动三个实例
+docker run -d myapp
+docker run -d myapp
+docker run -d myapp</code></pre>
+      </div>
+      <p><strong>声明式（Declarative）</strong>：你告诉系统<em>你想要什么结果</em>，怎么达成是系统的事。</p>
+      <div class="code-block" data-lang="yaml">
+<pre><code># 我要三个实例
+spec:
+  replicas: 3</code></pre>
+      </div>
+      <p>区别不只在写法。命令式的语句执行完就结束了——如果之后有一个实例挂了，没有任何东西会去补上。而声明式描述的是一个<strong>持续成立的状态</strong>，系统会一直努力让它成立。</p>
+      <p>这就是 K8s「自愈」能力的来源。它不是某个特殊功能，而是声明式的必然结果。</p>
+
+      <h3 id="control-loop">控制循环（Control Loop）</h3>
+      <p>声明式要生效，需要一个东西不停地干活，这就是<strong>控制循环</strong>，也叫<strong>调谐循环（Reconcile Loop）</strong>：</p>
+
+      <figure class="diagram" id="fig-loop">
+        <div class="diagram-canvas-wrap"></div>
+        <div class="diagram-controls-slot"></div>
+        <figcaption class="diagram-caption"><b>控制循环</b>：以「副本数保持 3」为例，点击播放看一轮完整的调谐过程</figcaption>
+      </figure>
+
+      <p>用伪代码表达，K8s 里<strong>每一个控制器（Controller）</strong>本质上都是这个循环：</p>
+      <div class="code-block" data-lang="go">
+<pre><code>for {
+    desired := getDesiredState()    // 从 API Server 读 spec
+    current := getCurrentState()    // 观察集群实际情况
+    diff := desired - current       // 求差
+    applyChanges(diff)              // 让 current 趋向 desired
+}</code></pre>
+      </div>
+      <p>举例：ReplicaSet 控制器不断检查「期望 3 个副本，实际几个」。少了就创建，多了就删除。<strong>它不关心为什么少了</strong>——可能是节点宕机、可能是你手动删了、可能是探针失败被重启——它只关心差异，然后消除差异。</p>
+
+      <h3 id="model-1-explains">这解释了什么</h3>
+      <p>一旦接受这个模型，很多现象就不需要单独记忆了：</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>现象</th><th>解释</th></tr></thead>
+          <tbody>
+            <tr><td><code>kubectl delete pod</code> 之后 Pod 又回来了</td><td>实际状态偏离了期望状态，控制器消除了差异</td></tr>
+            <tr><td>不该手动去改 Pod</td><td>你改的是「实际状态」，控制器会把它调谐回去</td></tr>
+            <tr><td>应该改 Deployment 而不是改 Pod</td><td>要改的是「期望状态」</td></tr>
+            <tr><td>节点挂了，上面的 Pod 自动跑到别处</td><td>控制器发现副本数不足，补上了</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="eventual-consistency">一个重要的推论：最终一致</h3>
+      <div class="callout info">
+        <div class="callout-title">最终一致（Eventually Consistent）</div>
+        <p>控制循环是<strong>持续逼近</strong>而非一次性完成的。你 <code>kubectl apply</code> 一个 YAML，命令返回成功只代表「API Server 收下了这份期望状态」，<strong>不代表它已经生效</strong>。中间要经历调度、拉镜像、启动容器等一系列异步过程。</p>
+        <p>这也是为什么 K8s 里到处是「等待就绪」的机制（比如探针），以及为什么 <code>apply</code> 之后立刻查状态，常常看到的不是最终结果。</p>
+      </div>
+
+      <hr class="sep">
+
+      <!-- ==================== 模型二 ==================== -->
+      <h2 id="model-2">模型二：一切皆资源</h2>
+      <p>K8s 可以被理解为：<strong>一个分布式的键值存储，加上一群不断调谐它的控制器。</strong></p>
+      <p>所有东西——Pod、Service、Node、乃至权限规则——都被抽象成<strong>资源（Resource）</strong>，也叫 <strong>API 对象（API Object）</strong>，通过统一的 REST API 读写。</p>
+
+      <h3 id="unified-skeleton">统一的骨架</h3>
+      <p>几乎每个 K8s 对象都长这样：</p>
+      <div class="code-block" data-lang="yaml" data-file="deployment.yaml">
+<pre><code>apiVersion: apps/v1      # 属于哪个 API 组、哪个版本
+kind: Deployment         # 是什么类型
+metadata:                # 元信息：名字、命名空间、标签……
+  name: web
+  namespace: default
+  labels:
+    app: web
+spec:                    # ★ 期望状态：你想让它变成什么样（你写）
+  replicas: 3
+status:                  # ★ 实际状态：它现在实际是什么样（K8s 写）
+  readyReplicas: 2</code></pre>
+      </div>
+
+      <div class="callout note">
+        <div class="callout-title">spec 与 status 的分离是理解 K8s 的关键</div>
+        <ul>
+          <li><code>spec</code> 由<strong>你</strong>（或 Helm、控制器）写入，描述期望</li>
+          <li><code>status</code> 由 <strong>K8s 组件</strong>写入，描述现实</li>
+          <li>控制循环做的事，就是让 <code>status</code> 不断逼近 <code>spec</code></li>
+        </ul>
+        <p>回头看模型一，会发现它就是这里的机制实现。两个模型是咬合的。</p>
+      </div>
+
+      <p>📌 <strong>实用推论</strong>：排查问题时，<code>kubectl get xxx -o yaml</code> 里<strong>先看 <code>status</code></strong>。期望与现实的差距，往往直接写在那里。</p>
+
+      <h3 id="model-2-explains">这解释了什么</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>现象</th><th>解释</th></tr></thead>
+          <tbody>
+            <tr><td><code>kubectl</code> 能用同一套语法操作所有资源</td><td>它们都是 REST 资源，动词一致</td></tr>
+            <tr><td><code>kubectl api-resources</code> 能列出所有类型</td><td>类型本身就是 API 的一部分</td></tr>
+            <tr><td>CRD 能无缝扩展 K8s</td><td>只是往 API 里注册一种新资源，其余机制自动复用</td></tr>
+            <tr><td>一切都可以用 YAML 描述和版本管理</td><td>因为一切都是数据</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>最后一条很重要，它意味着 <strong>K8s 集群的完整状态可以被 Git 管理</strong>——这就是 GitOps 的全部前提。</p>
+
+      <hr class="sep">
+
+      <!-- ==================== 模型三 ==================== -->
+      <h2 id="model-3">模型三：标签与选择器</h2>
+      <p>这是 K8s 最反直觉、也最灵活的一处设计。</p>
+
+      <h3 id="no-ownership">没有从属关系，只有匹配关系</h3>
+      <p>按常理，你会以为 Service 和它转发的 Pod 之间存在某种「包含」或「绑定」关系。<strong>并没有。</strong></p>
+      <p>Service 只声明一个<strong>选择器（Selector）</strong>：</p>
+      <div class="code-block" data-lang="yaml" data-file="service.yaml">
+<pre><code># Service
+spec:
+  selector:
+    app: web        # 我负责所有带这个标签的 Pod</code></pre>
+      </div>
+      <div class="code-block" data-lang="yaml" data-file="pod.yaml">
+<pre><code># Pod
+metadata:
+  labels:
+    app: web        # 我带这个标签</code></pre>
+      </div>
+      <p>两者互不知晓对方存在。Service 不「持有」Pod 列表，它只是<strong>持续地按标签筛选</strong>，筛出什么就把流量转给什么。</p>
+
+      <figure class="diagram" id="fig-selector">
+        <div class="diagram-canvas-wrap"></div>
+        <figcaption class="diagram-caption"><b>标签匹配</b>：Service 不认识任何 Pod，它只认识标签。匹配上的自动纳入，匹配不上的自动忽略</figcaption>
+      </figure>
+
+      <p>这种<strong>松耦合</strong>带来了极强的灵活性：</p>
+      <ul>
+        <li>Pod 可以随时销毁重建、IP 不断变化，Service 完全不用改</li>
+        <li>想切流量，只要改 Pod 的标签，或者改 Service 的选择器</li>
+        <li>灰度发布、蓝绿部署，本质上都是在操纵标签匹配关系</li>
+      </ul>
+
+      <h3 id="selector-everywhere">无处不在</h3>
+      <p>标签选择器不是 Service 的专属功能，而是 K8s 的<strong>通用组织方式</strong>：</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>场景</th><th>谁在选择谁</th></tr></thead>
+          <tbody>
+            <tr><td>Deployment 管理 Pod</td><td>通过 ReplicaSet 的标签选择器</td></tr>
+            <tr><td>Service 转发流量</td><td>选择器匹配 Pod 标签</td></tr>
+            <tr><td>调度亲和性</td><td>节点选择器 / 节点亲和性匹配<strong>节点</strong>标签</td></tr>
+            <tr><td>NetworkPolicy</td><td>选择器决定策略作用于哪些 Pod</td></tr>
+            <tr><td><code>kubectl get pods -l app=web</code></td><td>你在选择 Pod</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>注意最后两行：标签不只打在 Pod 上，节点也有标签。</strong>同一套机制。</p>
+
+      <h3 id="model-3-explains">这解释了什么</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>现象</th><th>解释</th></tr></thead>
+          <tbody>
+            <tr><td>手动建一个带相同标签的 Pod，Service 会自动把流量打给它</td><td>匹配上了就纳入</td></tr>
+            <tr><td>删掉 Service 的 Pod 却「删不干净」</td><td>Deployment 的选择器还在匹配，会重建</td></tr>
+            <tr><td>Service 后面没有可用 Pod 时不报错，只是超时</td><td>选择结果为空，这是合法状态</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">最常见的坑</div>
+        <p>Service 不通，八成是 <code>selector</code> 和 Pod 的 <code>labels</code> 没对上。用 <code>kubectl get endpoints</code> 一看便知——如果是空的，就是标签没匹配上。</p>
+      </div>
+
+      <hr class="sep">
+
+      <!-- ==================== 模型四 ==================== -->
+      <h2 id="model-4">模型四：中心辐射架构</h2>
+      <p>前三条讲的是「怎么想」，这一条讲「怎么搭」。</p>
+
+      <h3 id="only-apiserver">只有 API Server 能碰 etcd</h3>
+      <p>K8s 的所有组件——调度器、各种控制器、kubelet、kubectl——<strong>彼此之间不直接通信</strong>。它们只和 API Server 说话。</p>
+
+      <figure class="diagram" id="fig-hub">
+        <div class="diagram-canvas-wrap"></div>
+        <figcaption class="diagram-caption"><b>中心辐射（Hub-and-Spoke）</b>：API Server 是唯一的中枢，也是唯一能读写 etcd 的组件；其余组件只与它通信</figcaption>
+      </figure>
+
+      <h3 id="watch-collaboration">组件靠「监听」协作</h3>
+      <p>组件之间既然不直接通信，那怎么协作？答案是：<strong>监听资源变化（Watch）</strong>。</p>
+      <p>以「调度一个 Pod」为例：</p>
+      <ol>
+        <li>API Server 把 Pod 写入 etcd，此时它的 <code>spec.nodeName</code> 为空</li>
+        <li><strong>调度器</strong>一直监听着「未指定节点的 Pod」，发现了一个</li>
+        <li>调度器算出该放哪个节点，把结果写回 API Server（给 Pod 填上 <code>nodeName</code>）</li>
+        <li>目标节点的 <strong>kubelet</strong> 一直监听着「nodeName 是我的 Pod」，发现有活了</li>
+        <li>kubelet 拉起容器</li>
+      </ol>
+      <p>注意整个过程：<strong>调度器和 kubelet 从头到尾没有说过一句话。</strong>它们只是各自盯着 API Server 上自己关心的那部分数据，看到变化就干活。</p>
+      <p>这是彻底的解耦。（这条链路的完整版本，就是<a href="03-birth-of-a-pod.html">第 03 章 · 一个 Pod 的诞生</a>。）</p>
+
+      <h3 id="model-4-explains">这解释了什么</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>现象</th><th>解释</th></tr></thead>
+          <tbody>
+            <tr><td>API Server 可以水平扩展，加实例就行</td><td>它无状态，状态都在 etcd</td></tr>
+            <tr><td>调度器挂了，已运行的 Pod 不受影响</td><td>组件之间没有直接依赖</td></tr>
+            <tr><td>网络分区时节点上的 Pod 还能继续跑</td><td>kubelet 与 API Server 断连不会立刻杀 Pod</td></tr>
+            <tr><td>想加个新功能，不用改现有组件</td><td>新写个控制器监听相关资源即可（这就是 Operator 的原理）</td></tr>
+            <tr><td>etcd 必须做高可用，它挂了很麻烦</td><td>它是唯一的真相来源</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <hr class="sep">
+
+      <!-- ==================== 咬合 ==================== -->
+      <h2 id="mesh">四条模型怎么咬合</h2>
+      <p>它们不是并列的四条，而是一个整体：</p>
+
+      <figure class="diagram" id="fig-mesh">
+        <div class="diagram-canvas-wrap"></div>
+        <figcaption class="diagram-caption"><b>四条模型的因果链</b>：从数据模型出发，推出行为方式、组织方式与协作方式</figcaption>
+      </figure>
+
+      <ul>
+        <li>因为<strong>一切皆资源</strong>，所以状态可以被统一读写 →</li>
+        <li>因为状态可读写，所以可以用 <strong>spec 表达期望、status 记录现实</strong>，用<strong>控制循环</strong>去逼近 →</li>
+        <li>因为控制循环只需要「读状态、写状态」，所以组件之间<strong>不必直接通信</strong>，围着 API Server 转就行 →</li>
+        <li>而资源之间<strong>如何关联</strong>，靠的是<strong>标签匹配</strong>，而不是硬编码的引用关系</li>
+      </ul>
+      <p>这套组合拳的结果，就是一个<strong>高度解耦、可自愈、可无限扩展</strong>的系统。</p>
+
+      <hr class="sep">
+
+      <!-- ==================== 面试官视角 ==================== -->
+      <h2 id="interview">面试官视角</h2>
+      <p><strong>Q：说说你对 Kubernetes 设计理念的理解？</strong></p>
+      <p>这是道开放题，考的是你有没有体系，而不是你背了多少名词。</p>
+
+      <div class="answer-compare">
+        <div class="answer bad">
+          <div class="answer-head">✕ 平庸答案 · 罗列组件</div>
+          <div class="answer-body">
+            <p>「K8s 有 apiserver、etcd、scheduler、kubelet……」</p>
+            <p>这只是背了架构图，没有观点。面试官听完不知道你到底理解不理解。</p>
+          </div>
+        </div>
+        <div class="answer good">
+          <div class="answer-head">✓ 加分答案 · 抓住声明式这个核心，再展开</div>
+          <div class="answer-body">
+            <p>「K8s 最核心的设计是<strong>声明式 API 加控制循环</strong>。用户描述期望状态写在 <code>spec</code> 里，各个控制器通过调谐循环不断让实际的 <code>status</code> 逼近它。所谓自愈能力，本质上就是这个循环的自然结果，而不是某个独立特性。</p>
+            <p>支撑这个理念的是两点：一是<strong>一切皆资源</strong>，所有对象都通过统一的 API 读写，<code>spec</code> 和 <code>status</code> 严格分离；二是<strong>中心辐射架构</strong>，组件之间不直接通信，只监听 API Server 上的资源变化，因此彼此解耦，可以独立扩展和替换。</p>
+            <p>这套设计也带来了可扩展性——写一个自定义控制器监听自定义资源，就是 Operator 模式，它复用的是和内置控制器完全相同的机制。」</p>
+          </div>
+        </div>
+      </div>
+      <p>这段话里没有一个多余的名词，但把架构、自愈、扩展性都串起来了。</p>
+
+      <!-- ==================== 常见误区 ==================== -->
+      <h2 id="myths">常见误区</h2>
+
+      <div class="myth">
+        <div class="myth-q">误区一：「声明式」=「YAML 写法」</div>
+        <p class="myth-a">不是。命令式也能写 YAML（<code>kubectl apply</code> 和 <code>kubectl run</code> 的区别不在格式）。声明式的本质是<strong>你描述的是一个需要持续维持的状态，而非一次性的动作</strong>。</p>
+      </div>
+
+      <div class="myth">
+        <div class="myth-q">误区二：控制器会「知道」发生了什么</div>
+        <p class="myth-a">不会。控制器只看到「期望 3 个，实际 2 个」，它不知道也不关心为什么少了。这种「无知」恰恰是它健壮的原因——不管什么原因导致的偏差，处理方式都一样。</p>
+      </div>
+
+      <div class="myth">
+        <div class="myth-q">误区三：kubectl apply 成功 = 部署成功</div>
+        <p class="myth-a">不是。<code>apply</code> 成功只意味着 API Server 接受了你的期望状态。后续调度、拉镜像、启动全是异步的，可能失败。要确认真的起来了，得看 <code>kubectl rollout status</code> 或 Pod 的 <code>status</code>。</p>
+      </div>
+
+      <div class="myth">
+        <div class="myth-q">误区四：Service 里存着 Pod 列表</div>
+        <p class="myth-a">Service 对象本身<strong>不存</strong> Pod 列表，它只存选择器。真正维护后端列表的是 <strong>EndpointSlice</strong>（旧版本是 Endpoints）资源，由控制器根据标签匹配自动生成和更新。</p>
+      </div>
+
+      <!-- ==================== 延伸 ==================== -->
+      <h2 id="further">延伸</h2>
+      <ul>
+        <li><a href="https://kubernetes.io/docs/concepts/" rel="noopener">Kubernetes 官方文档 · Concepts</a></li>
+        <li>控制循环的实现细节（Informer、WorkQueue），见本项目 <a href="11-extensibility.html">11 · 扩展机制</a>（施工中）</li>
+        <li>想看这四条模型如何在真实流程中协同，见 <a href="03-birth-of-a-pod.html">03 · 一个 Pod 的诞生</a>（施工中）</li>
+      </ul>
+
+      <div class="mark-done">
+        <button type="button" data-chapter="00">读完本章，打个卡</button>
+      </div>
+
+      <nav class="chapter-nav" id="chapterNav" aria-label="章节导航"></nav>
+
+    </article>
+
+    <aside class="page-toc" id="pageToc" aria-label="本页目录"></aside>
+  </main>
+</div>
+
+<script src="assets/site.js"></script>
+<script src="assets/diagram.js"></script>
+<script src="assets/main.js"></script>
+<script>
+/* ---- 本章图表（数据描述，由 diagram.js 渲染） ---- */
+
+/* 图 1：控制循环（带动画演示） */
+K8C.Diagram.mount('#fig-loop', {
+  width: 720, height: 330,
+  nodes: [
+    { id:'observe', x:360, y:62,  w:180, h:56, label:'观察实际状态', sub:'Observe', color:'accent' },
+    { id:'compare', x:580, y:238, w:190, h:56, label:'与期望状态对比', sub:'Diff', color:'accent' },
+    { id:'act',     x:140, y:238, w:200, h:56, label:'执行动作消除差异', sub:'Act', color:'accent' }
+  ],
+  edges: [
+    { from:'observe', to:'compare' },
+    { from:'compare', to:'act', label:'期望 3 · 实际 2' },
+    { from:'act', to:'observe', label:'新建 1 个 Pod' }
+  ],
+  notes: [
+    { x:360, y:170, text:'控制循环', color:'mute' },
+    { x:360, y:190, text:'Control Loop / Reconcile Loop', color:'mute' }
+  ],
+  steps: [
+    { from:'observe', to:'compare', label:'读取集群现状：期望 3 个副本的 Deployment，实际只剩 2 个 Pod', dur:1100 },
+    { from:'compare', to:'act',     label:'与 spec 求差：期望 3，实际 2，缺 1 个', dur:1100 },
+    { from:'act',     to:'observe', label:'创建 1 个新 Pod 消除差异 —— 然后回到第一步，永不停歇', dur:1100 }
+  ]
+});
+
+/* 图 2：标签与选择器 */
+K8C.Diagram.mount('#fig-selector', {
+  width: 760, height: 330,
+  nodes: [
+    { id:'svc',  x:150, y:165, w:190, h:80, label:'Service', sub:'selector: app=web', kind:'hub' },
+    { id:'pod1', x:540, y:62,  w:210, h:56, label:'Pod', sub:'labels: { app: web }', color:'ok' },
+    { id:'pod2', x:540, y:165, w:210, h:56, label:'Pod', sub:'labels: { app: web }', color:'ok' },
+    { id:'pod3', x:540, y:268, w:210, h:56, label:'Pod', sub:'labels: { app: cache }', kind:'ghost' }
+  ],
+  edges: [
+    { from:'svc', to:'pod1', label:'匹配 ✓', color:'ok' },
+    { from:'svc', to:'pod2', label:'匹配 ✓', color:'ok' },
+    { from:'svc', to:'pod3', label:'不匹配', color:'danger', kind:'dashed' }
+  ],
+  notes: [
+    { x:150, y:262, text:'不持有 Pod 列表', color:'mute' },
+    { x:150, y:282, text:'只声明选择器', color:'mute' }
+  ]
+});
+
+/* 图 3：中心辐射架构 */
+K8C.Diagram.mount('#fig-hub', {
+  width: 880, height: 520,
+  nodes: [
+    { id:'api',   x:440, y:245, w:180, h:58, label:'API Server', sub:'唯一中枢', kind:'hub' },
+    { id:'etcd',  x:440, y:432, w:150, h:62, label:'etcd', sub:'唯一真相来源', kind:'store' },
+    { id:'kubec', x:112, y:72,  w:140, h:50, label:'kubectl', sub:'用户 / CI' },
+    { id:'sched', x:440, y:62,  w:150, h:50, label:'调度器', sub:'scheduler' },
+    { id:'cm',    x:768, y:72,  w:190, h:50, label:'控制器管理器', sub:'controller-manager' },
+    { id:'kl1',   x:112, y:418, w:170, h:52, label:'kubelet · 节点 1', sub:'监听分给自己的 Pod' },
+    { id:'kl2',   x:768, y:418, w:170, h:52, label:'kubelet · 节点 2', sub:'监听分给自己的 Pod' }
+  ],
+  edges: [
+    { from:'kubec', to:'api', kind:'bidir' },
+    { from:'sched', to:'api', kind:'bidir' },
+    { from:'cm',    to:'api', kind:'bidir' },
+    { from:'kl1',   to:'api', kind:'bidir' },
+    { from:'kl2',   to:'api', kind:'bidir' },
+    { from:'api',   to:'etcd', kind:'bidir', label:'读写' }
+  ],
+  notes: [
+    { x:440, y:503, text:'组件彼此不直接通信 —— 调度器和 kubelet 从头到尾没有说过一句话', color:'mute' }
+  ]
+});
+
+/* 图 4：四条模型的咬合 */
+K8C.Diagram.mount('#fig-mesh', {
+  width: 760, height: 420,
+  nodes: [
+    { id:'m2', x:380, y:60,  w:230, h:66, label:'模型二 · 一切皆资源', sub:'数据模型', color:'accent' },
+    { id:'m1', x:160, y:205, w:240, h:66, label:'模型一 · 声明式+控制循环', sub:'行为方式', color:'accent' },
+    { id:'m3', x:600, y:205, w:230, h:66, label:'模型三 · 标签解耦', sub:'组织方式', color:'accent' },
+    { id:'m4', x:380, y:350, w:240, h:66, label:'模型四 · 中心辐射架构', sub:'协作方式', color:'accent' }
+  ],
+  edges: [
+    { from:'m2', to:'m1', label:'spec / status 可统一读写' },
+    { from:'m2', to:'m3', label:'资源之间靠标签关联' },
+    { from:'m1', to:'m4', label:'组件只需读写状态，无需互通' }
+  ]
+});
+</script>
+</body>
+</html>

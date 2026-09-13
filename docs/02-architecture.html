@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>02 · 架构总览 · k8s-cliche</title>
+<meta name="description" content="K8s 控制平面与节点组件的职责划分：每个组件干什么、挂了会怎样。">
+<script>
+(function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+</script>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23326ce5' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23326ce5'/%3E%3C/svg%3E">
+</head>
+<body data-page="02">
+<a class="skip-link" href="#top">跳到正文</a>
+<div id="progress"></div>
+
+<header class="topbar">
+  <button class="icon-btn" id="navToggle" type="button" aria-label="打开目录">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+  </button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" style="color:var(--accent)">
+        <circle cx="32" cy="32" r="24" stroke-width="4"/>
+        <circle cx="32" cy="32" r="6" fill="currentColor" stroke="none"/>
+        <g stroke-width="4" stroke-linecap="round">
+          <line x1="32" y1="26" x2="32" y2="8"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(51.43 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(102.86 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(154.29 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(205.71 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(257.14 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(308.57 32 32)"/>
+        </g>
+      </svg>
+    </span>
+    k8s-cliche
+  </a>
+  <span class="topbar-chapter"></span>
+  <div class="topbar-spacer"></div>
+  <button class="icon-btn" id="themeToggle" type="button" title="切换深色 / 浅色主题" aria-label="切换主题">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4.5"/>
+      <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/>
+    </svg>
+  </button>
+</header>
+
+<div class="nav-scrim"></div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar" aria-label="章节目录">
+    <nav id="sidebarNav"></nav>
+  </aside>
+
+  <main class="main" id="top">
+    <article class="content">
+
+      <span class="chapter-eyebrow">主线 · 第 02 章</span>
+      <h1>架构总览</h1>
+      <p class="lede">两句话的架构：控制平面做决定，节点干活，中间只隔一个 API Server。</p>
+
+      <div class="tldr">
+        <div class="tldr-label">一句话答案</div>
+        <p>K8s 集群 = <strong>控制平面（Control Plane）</strong> + 若干<strong>节点（Node）</strong>。控制平面负责决策与记账（apiserver / etcd / scheduler / controller-manager），节点负责真正跑容器（kubelet / kube-proxy / 容器运行时）。</p>
+        <p>记住每个组件「干什么」和「<strong>挂了会怎样</strong>」，架构题就再也问不倒你。</p>
+      </div>
+
+      <!-- ==================== 总图 ==================== -->
+      <h2 id="overview">先看总图</h2>
+
+      <figure class="diagram" id="fig-arch">
+        <div class="diagram-canvas-wrap"></div>
+        <figcaption class="diagram-caption"><b>集群全景</b>：控制平面做决定，节点干活；kubectl、kubelet、scheduler 全都只与 API Server 通信（第 00 章模型四）</figcaption>
+      </figure>
+
+      <p>图里只有两类盒子：<strong>做决定的</strong>（控制平面）和<strong>干活的</strong>（节点）。下面逐个过。</p>
+
+      <!-- ==================== 控制平面 ==================== -->
+      <h2 id="control-plane">控制平面：做决定的四个组件</h2>
+
+      <h3 id="apiserver">kube-apiserver —— 唯一入口</h3>
+      <p>所有读写集群状态的请求都经过它：kubectl、kubelet、scheduler、controller-manager，无一例外。它做三件事：<strong>认证</strong>（你是谁）、<strong>鉴权</strong>（你允许吗）、<strong>准入</strong>（合规吗），然后才把请求落库或返回。</p>
+      <p>它是<strong>无状态</strong>的——状态都在 etcd——所以可以水平扩展，多副本前面挂负载均衡。</p>
+      <p>它是<strong>唯一</strong>能读写 etcd 的组件。这不是限制，而是设计：写入口单一，认证、审计、watch 通知才有统一的抓手。</p>
+
+      <h3 id="etcd">etcd —— 唯一真相来源</h3>
+      <p>一个分布式键值存储（基于 Raft 共识算法）。集群里<strong>所有资源对象</strong>——每个 Pod、每个 Service、每条 RBAC 规则——都以 JSON 形式存在这里。</p>
+      <p>注意它存的是<strong>声明的数据</strong>（spec 与 status 的记录），不是容器本身。容器跑在各节点的运行时里，etcd 里只有「账本」。</p>
+      <p>它是整个集群最金贵的组件：<strong>etcd 数据丢了，集群就失忆了</strong>。所以生产环境必须多副本 + 定期备份。</p>
+
+      <h3 id="scheduler">kube-scheduler —— 只写答案，不动手</h3>
+      <p>监听「还没分配节点的 Pod」，为它选一个节点，然后把 <code>nodeName</code> 写回 API Server。完事。</p>
+      <p>选择过程两阶段：<strong>过滤（Filter）</strong>——剔除不满足条件的节点（资源不够、污点不容忍）；<strong>打分（Score）</strong>——给剩下的节点排序，选最优。</p>
+      <p>关键认知：<strong>scheduler 不启动任何东西</strong>。它只做一个绑定（bind）动作。真正拉起容器的是节点上的 kubelet——两者从头到尾没有直接通信（第 00 章模型四的例子）。</p>
+
+      <h3 id="controller-manager">kube-controller-manager —— 控制循环的集合体</h3>
+      <p>第 00 章说「每个控制器都是一个调谐循环」。这个进程里跑着几十个内置控制器：</p>
+      <ul>
+        <li><strong>Deployment / ReplicaSet 控制器</strong>：维持副本数</li>
+        <li><strong>Node 控制器</strong>：盯着节点心跳，节点失联就标记、驱逐其上的 Pod</li>
+        <li><strong>EndpointSlice 控制器</strong>：按标签维护 Service 的后端列表</li>
+        <li><strong>ServiceAccount / Namespace / Job 控制器</strong>……</li>
+      </ul>
+      <p>它是「自愈」二字的物理载体。它挂了，集群不会立刻死，但<strong>从此没人修任何东西</strong>。</p>
+
+      <!-- ==================== 节点 ==================== -->
+      <h2 id="node">节点：干活的三件套</h2>
+
+      <h3 id="kubelet">kubelet —— 节点上的代理人</h3>
+      <p>每个节点一个。它监听「分配给本节点的 Pod」，然后：</p>
+      <ul>
+        <li>通过 <strong>CRI</strong> 让容器运行时拉镜像、起容器</li>
+        <li>通过 <strong>CNI</strong> 给 Pod 配网络，通过 <strong>CSI</strong> 挂存储卷</li>
+        <li>执行探针（liveness / readiness / startup），按要求重启容器</li>
+        <li>把 Pod 与节点的状态<strong>写回</strong> API Server</li>
+      </ul>
+      <p>kubelet 是控制平面意志在节点上的执行者，也是节点现实向控制平面的汇报者。双向的。</p>
+
+      <h3 id="kube-proxy">kube-proxy —— 名字最有欺骗性的组件</h3>
+      <p>它维护 Service 的转发规则（iptables 或 IPVS 模式）。<strong>注意：在主流模式下，它不在数据路径上。</strong></p>
+      <p>规则写进内核之后，流量由内核的 netfilter 直接转发，kube-proxy 进程本身一个包都不碰。它是个「规则维护员」，不是「代理」。叫这个名字是历史遗留。</p>
+
+      <h3 id="runtime">容器运行时 —— 真正跑容器的</h3>
+      <p>containerd、CRI-O 等，实现 CRI 接口。拉镜像、创建隔离环境、启动进程——所有「真正发生」的事都在这一层。K8s 控制平面从头到尾不碰容器（第 01 章误区三）。</p>
+
+      <!-- ==================== -addon ==================== -->
+      <h2 id="addons">附加组件：不是内置的，但几乎是必需的</h2>
+      <p>下面这些<strong>不属于</strong> K8s 二进制，而是以工作负载形式部署在集群里的「插件」。面试时区分清楚很加分：</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>组件</th><th>职责</th><th>形态</th></tr></thead>
+          <tbody>
+            <tr><td><strong>CoreDNS</strong></td><td>集群内 DNS：把 Service 名解析成 ClusterIP</td><td>Deployment（跑在集群里）</td></tr>
+            <tr><td><strong>CNI 插件</strong>（Calico / Cilium / Flannel…）</td><td>给 Pod 分配 IP、实现跨节点网络、NetworkPolicy</td><td>DaemonSet + 节点上的二进制</td></tr>
+            <tr><td><strong>Ingress 控制器</strong>（nginx / traefik…）</td><td>七层路由：域名 / 路径 → Service</td><td>Deployment + LoadBalancer Service</td></tr>
+            <tr><td><strong>metrics-server</strong></td><td>聚合资源指标，喂给 HPA 和 <code>kubectl top</code></td><td>Deployment</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>有个有趣的自指：CoreDNS 本身跑在集群里、是个 Pod——<strong>集群的基础设施由集群自己承载</strong>。这也是为什么新集群装好后第一件事往往是装 CNI：在 CNI 就绪前，CoreDNS 的 Pod 会一直卡着。</p>
+
+      <!-- ==================== 挂了会怎样 ==================== -->
+      <h2 id="failure">每个组件「挂了会怎样」</h2>
+      <p>这张表是架构理解的试金石。能背出职责是及格，能说清故障影响才是理解。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>组件</th><th>挂了之后</th></tr></thead>
+          <tbody>
+            <tr><td><strong>kube-apiserver</strong></td><td>一切新变更停摆：kubectl 无响应、新 Pod 无法创建。但<strong>已运行的工作负载继续跑</strong>——数据路径不依赖它</td></tr>
+            <tr><td><strong>etcd</strong></td><td>最严重。集群失忆：apiserver 无数据可读，等同全集群不可用。多副本 + 备份是唯一解</td></tr>
+            <tr><td><strong>scheduler</strong></td><td>新 Pod 永远 Pending；已运行的 Pod 不受影响</td></tr>
+            <tr><td><strong>controller-manager</strong></td><td>没有自愈、没有扩缩、没有副本维持。删一个 Pod 就少一个，没人补。集群进入「僵尸模式」：活着，但不再自我修复</td></tr>
+            <tr><td><strong>kubelet</strong>（单节点）</td><td>该节点失联被标记 NotReady；宽限期后其上的 Pod 被控制器在别处重建。节点上已跑的容器可能还在，但集群已经「不认」它了</td></tr>
+            <tr><td><strong>kube-proxy</strong>（单节点）</td><td>该节点的 Service 规则不再更新：新 Service 不通；旧规则还在内核里，存量连接大多照常</td></tr>
+            <tr><td><strong>CoreDNS</strong></td><td>集群内域名解析失败：应用间用服务名互访全部报错。用 IP 直连的侥幸存活</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout info">
+        <div class="callout-title">一个贯穿全表的规律</div>
+        <p>控制平面的故障影响<strong>「未来的变更」</strong>，节点数据路径的故障影响<strong>「当前的流量」</strong>。两者解耦（第 00 章模型四）的直接红利就是：大脑短暂罢工，四肢还能继续动。</p>
+      </div>
+
+      <hr class="sep">
+
+      <!-- ==================== 面试官视角 ==================== -->
+      <h2 id="interview">面试官视角</h2>
+
+      <p><strong>Q1：介绍一下 K8s 的架构？</strong></p>
+      <div class="answer-compare">
+        <div class="answer bad">
+          <div class="answer-head">✕ 平庸答案 · 报菜名</div>
+          <div class="answer-body"><p>「控制平面有 apiserver、etcd、scheduler、controller-manager；节点有 kubelet、kube-proxy、容器运行时。」</p><p>——正确但扁平，像目录页。面试官追问「它们怎么协作」就露馅。</p></div>
+        </div>
+        <div class="answer good">
+          <div class="answer-head">✓ 加分答案 · 按「决策 / 执行」组织，带协作关系</div>
+          <div class="answer-body">
+            <p>「我习惯把架构分成决策和执行两层。决策层是控制平面：apiserver 是唯一入口和唯一能写 etcd 的组件，etcd 存所有资源对象，scheduler 负责选节点，controller-manager 里跑着所有内置控制循环。执行层是节点：kubelet 接收指令、调用运行时跑容器，并把状态写回去。</p>
+            <p>两层之间只通过 API Server 通信，组件彼此不直接调用——scheduler 选完节点只是写回一个字段，kubelet 靠 watch 发现自己有活干。这个设计的好处是故障隔离：控制平面挂了，已运行的负载和数据路径还能继续工作一段时间。」</p>
+          </div>
+        </div>
+      </div>
+
+      <p><strong>Q2：kube-proxy 是怎么转发流量的？</strong></p>
+      <div class="answer-compare">
+        <div class="answer bad">
+          <div class="answer-head">✕ 平庸答案（且是错的）</div>
+          <div class="answer-body"><p>「kube-proxy 把发给 Service 的流量代理到后端 Pod。」</p><p>——「代理」二字是陷阱。追问「数据路径经过 kube-proxy 进程吗」就崩了。</p></div>
+        </div>
+        <div class="answer good">
+          <div class="answer-head">✓ 加分答案 · 区分控制路径与数据路径</div>
+          <div class="answer-body"><p>「严格说它不转发。kube-proxy 监听 Service 和 EndpointSlice 的变化，把转发规则写进内核——iptables 模式写 netfilter 规则，IPVS 模式写 IPVS 表。之后流量由内核直接转发，kube-proxy 不在数据路径上。所以它是个规则维护员，叫 proxy 是历史遗留。这也解释了为什么 kube-proxy 挂了之后存量连接大多不受影响：规则还在内核里。」</p></div>
+        </div>
+      </div>
+
+      <!-- ==================== 常见误区 ==================== -->
+      <h2 id="myths">常见误区</h2>
+
+      <div class="myth">
+        <div class="myth-q">误区一：kube-proxy 在转发 Service 流量</div>
+        <p class="myth-a">见上。它维护内核规则，数据路径不经过它。这是架构题里最高频的陷阱。</p>
+      </div>
+
+      <div class="myth">
+        <div class="myth-q">误区二：etcd 里存着容器的状态</div>
+        <p class="myth-a">etcd 存的是资源对象的声明与状态<strong>记录</strong>（JSON）。容器的真实运行状态在各节点运行时里，kubelet 观察后写回 status。账本和货物是两回事。</p>
+      </div>
+
+      <div class="myth">
+        <div class="myth-q">误区三：master 是一台机器</div>
+        <p class="myth-a">「master」是旧称，现在叫控制平面，而且生产环境通常是<strong>多副本高可用</strong>：多个 apiserver 实例 + 奇数个 etcd 成员（Raft 需要多数派）。把控制平面理解成单点，HA 方案就想不明白。</p>
+      </div>
+
+      <div class="myth">
+        <div class="myth-q">误区四：控制平面挂了，服务立刻全死</div>
+        <p class="myth-a">不会。已运行容器、已写入内核的网络规则都还能工作。死的是「变更能力」：不能部署、不能自愈、不能扩缩。理解这个时间差，故障预案才写得对。</p>
+      </div>
+
+      <!-- ==================== 延伸 ==================== -->
+      <h2 id="further">延伸</h2>
+      <ul>
+        <li><a href="https://kubernetes.io/docs/concepts/architecture/" rel="noopener">官方文档 · Architecture</a></li>
+        <li>etcd 与 Raft：<a href="https://etcd.io/docs/" rel="noopener">etcd 官方文档</a></li>
+        <li>这些组件在一次真实部署中如何接力：<a href="03-birth-of-a-pod.html">03 · 一个 Pod 的诞生</a></li>
+      </ul>
+
+      <div class="mark-done">
+        <button type="button" data-chapter="02">读完本章，打个卡</button>
+      </div>
+
+      <nav class="chapter-nav" id="chapterNav" aria-label="章节导航"></nav>
+
+    </article>
+
+    <aside class="page-toc" id="pageToc" aria-label="本页目录"></aside>
+  </main>
+</div>
+
+<script src="assets/site.js"></script>
+<script src="assets/diagram.js"></script>
+<script src="assets/main.js"></script>
+<script>
+/* 集群全景图 */
+K8C.Diagram.mount('#fig-arch', {
+  width: 900, height: 560,
+  groups: [
+    { x:26,  y:26,  w:848, h:228, label:'控制平面（Control Plane）· 做决定', color:'accent' },
+    { x:26,  y:292, w:404, h:244, label:'节点（Node）× N · 干活' },
+    { x:470, y:292, w:404, h:244, label:'节点（Node）× N · 干活' }
+  ],
+  nodes: [
+    { id:'api',   x:450, y:96,  w:180, h:54, label:'kube-apiserver', sub:'唯一入口 · 唯一写 etcd', kind:'hub' },
+    { id:'etcd',  x:160, y:192, w:130, h:60, label:'etcd', sub:'唯一真相来源', kind:'store' },
+    { id:'sched', x:450, y:196, w:150, h:50, label:'调度器', sub:'只写答案，不动手' },
+    { id:'cm',    x:740, y:192, w:180, h:50, label:'控制器管理器', sub:'所有内置控制循环' },
+
+    { id:'kl1', x:130, y:344, w:150, h:48, label:'kubelet', sub:'节点代理人' },
+    { id:'kp1', x:130, y:428, w:150, h:48, label:'kube-proxy', sub:'维护内核规则' },
+    { id:'rt1', x:320, y:386, w:96,  h:76, label:'容器\n运行时', sub:'containerd' },
+    { id:'pd1', x:320, y:486, w:96,  h:40, label:'Pod', kind:'ghost' },
+
+    { id:'kl2', x:574, y:344, w:150, h:48, label:'kubelet', sub:'节点代理人' },
+    { id:'kp2', x:574, y:428, w:150, h:48, label:'kube-proxy', sub:'维护内核规则' },
+    { id:'rt2', x:764, y:386, w:96,  h:76, label:'容器\n运行时', sub:'containerd' },
+    { id:'pd2', x:764, y:486, w:96,  h:40, label:'Pod', kind:'ghost' }
+  ],
+  edges: [
+    { from:'api', to:'etcd',  kind:'bidir', label:'读写' },
+    { from:'api', to:'sched', kind:'bidir' },
+    { from:'api', to:'cm',    kind:'bidir' },
+    { from:'api', to:'kl1',   kind:'bidir' },
+    { from:'api', to:'kl2',   kind:'bidir' },
+    { from:'kl1', to:'rt1',   label:'CRI' },
+    { from:'rt1', to:'pd1' },
+    { from:'kl2', to:'rt2',   label:'CRI' },
+    { from:'rt2', to:'pd2' }
+  ],
+  notes: [
+    { x:450, y:552, text:'kubectl、CI、其他一切组件 —— 同样只与 API Server 通信', color:'mute' }
+  ]
+});
+</script>
+</body>
+</html>

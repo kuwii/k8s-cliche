@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>附录 · 术语对照表 · k8s-cliche</title>
+<meta name="description" content="Kubernetes 中英术语对照表，跟随中文社区实际语感。">
+<script>
+(function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+</script>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23326ce5' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23326ce5'/%3E%3C/svg%3E">
+</head>
+<body data-page="glossary">
+<a class="skip-link" href="#top">跳到正文</a>
+<div id="progress"></div>
+
+<header class="topbar">
+  <button class="icon-btn" id="navToggle" type="button" aria-label="打开目录">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+  </button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" style="color:var(--accent)">
+        <circle cx="32" cy="32" r="24" stroke-width="4"/>
+        <circle cx="32" cy="32" r="6" fill="currentColor" stroke="none"/>
+        <g stroke-width="4" stroke-linecap="round">
+          <line x1="32" y1="26" x2="32" y2="8"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(51.43 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(102.86 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(154.29 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(205.71 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(257.14 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(308.57 32 32)"/>
+        </g>
+      </svg>
+    </span>
+    k8s-cliche
+  </a>
+  <span class="topbar-chapter"></span>
+  <div class="topbar-spacer"></div>
+  <button class="icon-btn" id="themeToggle" type="button" title="切换深色 / 浅色主题" aria-label="切换主题">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4.5"/>
+      <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/>
+    </svg>
+  </button>
+</header>
+
+<div class="nav-scrim"></div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar" aria-label="章节目录">
+    <nav id="sidebarNav"></nav>
+  </aside>
+
+  <main class="main" id="top">
+    <article class="content">
+      <span class="chapter-eyebrow">附录</span>
+      <h1>术语对照表</h1>
+      <p class="lede">中英对照，跟随中文社区实际语感。括号内为英文原文或社区惯用写法。</p>
+
+      <div class="tldr">
+        <div class="tldr-label">使用约定</div>
+        <p>三档处理：<strong>中文为主</strong>（节点 Node、调度器 Scheduler）；<strong>英文为主</strong>（Pod、Deployment、Service——社区不说「容器组」「部署对象」）；<strong>组件名直接用英文</strong>（kubelet、etcd、kube-proxy）。</p>
+      </div>
+
+      <h2 id="core">核心概念</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>英文</th><th>中文 / 惯用</th><th>一句话</th></tr></thead>
+          <tbody>
+            <tr><td>Cluster</td><td>集群</td><td>一组被 K8s 统一管理的机器</td></tr>
+            <tr><td>Node</td><td>节点</td><td>集群中的一台工作机器（旧称 minion）</td></tr>
+            <tr><td>Control Plane</td><td>控制平面</td><td>做决定的组件集合（旧称 master）</td></tr>
+            <tr><td>Pod</td><td>Pod（官方译「容器组」，社区不用）</td><td>最小调度单元，共享网络/存储的容器组</td></tr>
+            <tr><td>Workload</td><td>工作负载</td><td>「怎么跑容器」的对象族</td></tr>
+            <tr><td>Namespace</td><td>命名空间</td><td>名字与配额的作用域</td></tr>
+            <tr><td>Label / Selector</td><td>标签 / 选择器</td><td>K8s 的通用组织与匹配机制</td></tr>
+            <tr><td>Annotation</td><td>注解</td><td>附带元信息，不参与选择</td></tr>
+            <tr><td>Desired State / Actual State</td><td>期望状态 / 实际状态</td><td>spec 与 status 所记录的两侧</td></tr>
+            <tr><td>Reconcile / Reconcile Loop</td><td>调谐 / 调谐循环</td><td>让实际逼近期望的控制器循环</td></tr>
+            <tr><td>Declarative / Imperative</td><td>声明式 / 命令式</td><td>描述结果 vs 描述步骤</td></tr>
+            <tr><td>Eventually Consistent</td><td>最终一致</td><td>变更异步生效，状态持续逼近</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="components">组件</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>英文</th><th>中文 / 惯用</th><th>一句话</th></tr></thead>
+          <tbody>
+            <tr><td>kube-apiserver</td><td>API 服务器</td><td>唯一入口、唯一写 etcd 者</td></tr>
+            <tr><td>etcd</td><td>etcd</td><td>分布式键值存储，唯一真相来源</td></tr>
+            <tr><td>kube-scheduler</td><td>调度器</td><td>过滤打分后绑定节点，只写答案</td></tr>
+            <tr><td>kube-controller-manager</td><td>控制器管理器</td><td>内置控制循环的集合体</td></tr>
+            <tr><td>kubelet</td><td>kubelet</td><td>节点代理人，执行与汇报</td></tr>
+            <tr><td>kube-proxy</td><td>kube-proxy</td><td>Service 内核规则的维护员（不在数据路径）</td></tr>
+            <tr><td>Container Runtime</td><td>容器运行时</td><td>真正跑容器者：containerd / CRI-O</td></tr>
+            <tr><td>CoreDNS</td><td>CoreDNS</td><td>集群内 DNS</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="interfaces">标准接口</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>英文</th><th>管什么</th></tr></thead>
+          <tbody>
+            <tr><td>CRI（Container Runtime Interface）</td><td>K8s ↔ 容器运行时</td></tr>
+            <tr><td>CNI（Container Network Interface）</td><td>Pod 网络：IP 分配、连通、NetworkPolicy 执行</td></tr>
+            <tr><td>CSI（Container Storage Interface）</td><td>存储卷的供给与挂载</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="objects">对象与机制</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>英文</th><th>中文 / 惯用</th><th>一句话</th></tr></thead>
+          <tbody>
+            <tr><td>Deployment / ReplicaSet</td><td>Deployment / ReplicaSet</td><td>无状态工作负载 / 维持副本数的实现层</td></tr>
+            <tr><td>StatefulSet / DaemonSet</td><td>StatefulSet / DaemonSet</td><td>有身份的工作负载 / 每节点一份</td></tr>
+            <tr><td>Job / CronJob</td><td>Job / CronJob</td><td>跑完即止 / 定时任务</td></tr>
+            <tr><td>Service</td><td>Service（不说「服务对象」）</td><td>一组 Pod 的稳定虚拟入口</td></tr>
+            <tr><td>EndpointSlice</td><td>EndpointSlice</td><td>Service 的后端列表</td></tr>
+            <tr><td>Ingress</td><td>Ingress</td><td>七层路由规则</td></tr>
+            <tr><td>ConfigMap / Secret</td><td>ConfigMap / Secret（配置映射 / 密钥）</td><td>明文配置 / 敏感信息</td></tr>
+            <tr><td>PV / PVC / StorageClass</td><td>PV / PVC / StorageClass</td><td>存储本体 / 申请单 / 创建配方</td></tr>
+            <tr><td>Probe（liveness/readiness/startup）</td><td>探针（存活/就绪/启动）</td><td>管生死 / 管流量 / 管慢启动</td></tr>
+            <tr><td>requests / limits</td><td>requests / limits（请求量/限制量）</td><td>调度依据与保障 / 使用上限</td></tr>
+            <tr><td>QoS Class</td><td>服务质量等级</td><td>Guaranteed / Burstable / BestEffort，决定驱逐顺序</td></tr>
+            <tr><td>Eviction</td><td>驱逐</td><td>节点压力下 kubelet 主动杀 Pod 腾资源</td></tr>
+            <tr><td>Taint / Toleration</td><td>污点 / 容忍</td><td>节点拒客 / Pod 获准进入</td></tr>
+            <tr><td>Affinity / Anti-Affinity</td><td>亲和性 / 反亲和性</td><td>想靠近谁 / 想避开谁</td></tr>
+            <tr><td>RBAC</td><td>基于角色的访问控制</td><td>Role + Binding 的权限体系</td></tr>
+            <tr><td>ServiceAccount</td><td>服务账户</td><td>Pod 的 API 身份</td></tr>
+            <tr><td>Admission（Mutating/Validating）</td><td>准入（变更型/校验型）</td><td>请求落库前的关卡</td></tr>
+            <tr><td>CRD / Operator</td><td>CRD / Operator</td><td>自定义资源类型 / CRD+控制器</td></tr>
+            <tr><td>Informer / WorkQueue</td><td>Informer / 工作队列</td><td>List-Watch 缓存 / 事件去重缓冲</td></tr>
+            <tr><td>ownerReferences</td><td>属主引用</td><td>所有权与级联删除的依据</td></tr>
+            <tr><td>finalizer</td><td>终结器</td><td>删除前的「未竟事项」钩子</td></tr>
+            <tr><td>Graceful Shutdown</td><td>优雅终止</td><td>SIGTERM → 宽限期 → SIGKILL</td></tr>
+            <tr><td>Rolling Update / Rollback</td><td>滚动更新 / 回滚</td><td>新旧 RS 交替伸缩 / 切回旧 RS</td></tr>
+            <tr><td>GitOps</td><td>GitOps</td><td>以 Git 为唯一事实来源的交付方式</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="states">状态词</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>状态</th><th>含义</th></tr></thead>
+          <tbody>
+            <tr><td>Pending</td><td>已受理未就绪：多在等调度或等镜像</td></tr>
+            <tr><td>Running</td><td>至少一个容器在运行（不代表可用）</td></tr>
+            <tr><td>Succeeded / Failed</td><td>全部容器正常退出 / 有容器失败退出</td></tr>
+            <tr><td>CrashLoopBackOff</td><td>反复崩溃重启，退避间隔递增</td></tr>
+            <tr><td>ImagePullBackOff</td><td>镜像拉取失败重试中</td></tr>
+            <tr><td>ContainerCreating</td><td>沙箱/镜像/卷准备中</td></tr>
+            <tr><td>Terminating</td><td>终止流程中（优雅终止或 finalizer 未清）</td></tr>
+            <tr><td>Evicted</td><td>被节点驱逐</td></tr>
+            <tr><td>NotReady（Node）</td><td>节点失联或不健康</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mark-done">
+        <button type="button" data-chapter="glossary.html">读完本章，打个卡</button>
+      </div>
+
+      <nav class="chapter-nav" id="chapterNav" aria-label="章节导航"></nav>
+    </article>
+
+    <aside class="page-toc" id="pageToc" aria-label="本页目录"></aside>
+  </main>
+</div>
+
+<script src="assets/site.js"></script>
+<script src="assets/diagram.js"></script>
+<script src="assets/main.js"></script>
+</body>
+</html>

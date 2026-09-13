@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>12 · 运维与排障 · k8s-cliche</title>
+<meta name="description" content="排障方法论、排查树、kubectl 命令速查与经典案例。">
+<script>
+(function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+</script>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23326ce5' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23326ce5'/%3E%3C/svg%3E">
+</head>
+<body data-page="12">
+<a class="skip-link" href="#top">跳到正文</a>
+<div id="progress"></div>
+
+<header class="topbar">
+  <button class="icon-btn" id="navToggle" type="button" aria-label="打开目录">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+  </button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" style="color:var(--accent)">
+        <circle cx="32" cy="32" r="24" stroke-width="4"/>
+        <circle cx="32" cy="32" r="6" fill="currentColor" stroke="none"/>
+        <g stroke-width="4" stroke-linecap="round">
+          <line x1="32" y1="26" x2="32" y2="8"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(51.43 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(102.86 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(154.29 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(205.71 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(257.14 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(308.57 32 32)"/>
+        </g>
+      </svg>
+    </span>
+    k8s-cliche
+  </a>
+  <span class="topbar-chapter"></span>
+  <div class="topbar-spacer"></div>
+  <button class="icon-btn" id="themeToggle" type="button" title="切换深色 / 浅色主题" aria-label="切换主题">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4.5"/>
+      <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/>
+    </svg>
+  </button>
+</header>
+
+<div class="nav-scrim"></div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar" aria-label="章节目录">
+    <nav id="sidebarNav"></nav>
+  </aside>
+
+  <main class="main" id="top">
+    <article class="content">
+      <span class="chapter-eyebrow">专题 · 第 12 章</span>
+      <h1>运维与排障</h1>
+      <p class="lede">排障不是背命令，是「先定位卡在哪一层，再取对应的证据」。</p>
+
+      <div class="tldr">
+        <div class="tldr-label">一句话答案</div>
+        <p>排障三板斧：<code>describe</code> 看事件、<code>logs</code> 看输出、<code>get -o yaml</code> 看期望与现实的差距。顺序通常是<strong>先事件后日志</strong>——因为日志可能根本不存在（容器没起来），而事件永远在说话。</p>
+      </div>
+
+      <h2 id="method">方法论：先分层，再取证</h2>
+      <p>拿到「服务不正常」，先问它属于哪一层：</p>
+      <ol>
+        <li><strong>Pod 层</strong>：Pod 起不来 / 反复重启 / 不 Ready → 走第 03 章的卡站对照表</li>
+        <li><strong>服务层</strong>：Pod 全 Ready 但访问不通 → Service / EndpointSlice / DNS / NetworkPolicy</li>
+        <li><strong>节点层</strong>：单节点上的 Pod 集体异常 → 节点资源压力、kubelet、磁盘、NotReady</li>
+        <li><strong>集群层</strong>：全局性异常 → 控制平面组件、etcd、证书过期</li>
+      </ol>
+      <p>分层之后，取证手段是确定的：Pod 层看 events 和 logs；服务层看 endpoints 和规则；节点层看 <code>describe node</code> 和节点指标；集群层看组件日志与 <code>kubectl get componentstatuses</code> 类信号。</p>
+
+      <h2 id="tree">排查树（速查版）</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>现象</th><th>第一步</th><th>常见结论</th></tr></thead>
+          <tbody>
+            <tr><td>Pod <code>Pending</code></td><td><code>describe pod</code> 看 Events</td><td>资源不足 / 污点不容忍 / PVC 未绑定</td></tr>
+            <tr><td><code>ImagePullBackOff</code></td><td>Events 里的拉取错误</td><td>镜像名错 / 无权限 / 缺 imagePullSecret</td></tr>
+            <tr><td><code>CrashLoopBackOff</code></td><td><code>logs -p</code> 看上一次的输出</td><td>启动即退出：配置缺、依赖连不上、命令错</td></tr>
+            <tr><td><code>READY 0/1</code> 但 Running</td><td>探针配置 + 应用端口</td><td>readiness 失败：端口没监听、路径 404、依赖未就绪</td></tr>
+            <tr><td>Service 不通</td><td><code>get endpoints</code></td><td>空 → 标签没对上或 Pod 没 Ready；非空 → 逐跳查网络</td></tr>
+            <tr><td>域名解析失败</td><td>换完整域名重试</td><td>search 域/ndots 问题；再查 CoreDNS Pod 状态</td></tr>
+            <tr><td>节点 <code>NotReady</code></td><td><code>describe node</code> + 节点上 kubelet 日志</td><td>kubelet 挂了 / 磁盘压力 / 网络插件异常</td></tr>
+            <tr><td>Pod 被 <code>Evicted</code></td><td><code>describe node</code> 看压力条件</td><td>节点内存/磁盘压力，按 QoS 驱逐（第 09 章）</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="commands">命令速查</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>目的</th><th>命令</th></tr></thead>
+          <tbody>
+            <tr><td>看事件（排障第一入口）</td><td><code>kubectl describe pod &lt;name&gt;</code>；<code>kubectl get events --sort-by=.lastTimestamp</code></td></tr>
+            <tr><td>看日志 / 上一次崩溃的日志</td><td><code>kubectl logs &lt;pod&gt; -c &lt;container&gt;</code>；加 <code>-p</code> 看前一个实例；<code>-f</code> 跟随；<code>--since=10m</code></td></tr>
+            <tr><td>看期望与现实的差距</td><td><code>kubectl get pod &lt;name&gt; -o yaml</code>（对比 spec 与 status）</td></tr>
+            <tr><td>进容器 / 容器已崩时</td><td><code>kubectl exec -it &lt;pod&gt; -- sh</code>；崩溃中用 <code>kubectl debug</code> 附加临时容器</td></tr>
+            <tr><td>本地端口转发调试</td><td><code>kubectl port-forward svc/web 8080:80</code></td></tr>
+            <tr><td>滚动更新状态 / 回滚</td><td><code>kubectl rollout status deploy/web</code>；<code>rollout history</code>；<code>rollout undo</code></td></tr>
+            <tr><td>扩缩容</td><td><code>kubectl scale deploy/web --replicas=5</code></td></tr>
+            <tr><td>节点维护：停止调度 / 驱逐</td><td><code>kubectl cordon &lt;node&gt;</code>；<code>kubectl drain &lt;node&gt; --ignore-daemonsets</code></td></tr>
+            <tr><td>资源用量</td><td><code>kubectl top node/pod</code>（依赖 metrics-server）</td></tr>
+            <tr><td>权限验证</td><td><code>kubectl auth can-i &lt;verb&gt; &lt;resource&gt; --as=&lt;sa&gt;</code></td></tr>
+            <tr><td>提取字段</td><td><code>kubectl get pod x -o jsonpath='{.status.podIP}'</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="cases">五个经典案例（一句话版）</h2>
+      <ul>
+        <li><strong>部署后 502</strong>：endpoints 为空 → Pod 的 readiness 探针端口写错 → 改探针，滚动更新</li>
+        <li><strong>间歇性超时</strong>：CPU limit 过低导致节流毛刺 → 提高或取消 CPU limit（第 09 章）</li>
+        <li><strong>配置改了不生效</strong>：注入方式是环境变量 → 触发滚动更新；或 volume 但用了 subPath</li>
+        <li><strong>节点加进来却不调度</strong>：节点带未容忍的污点（新节点 taint 未移除）→ 检查 taints</li>
+        <li><strong>集群证书过期全站 401</strong>：kubeadm 集群证书轮换未做 → 定期轮换是运维清单固定项</li>
+      </ul>
+
+      <h2 id="interview">面试官视角</h2>
+      <p><strong>Q：一个 Pod 处于 CrashLoopBackOff，你怎么排查？</strong></p>
+      <div class="answer-compare">
+        <div class="answer bad">
+          <div class="answer-head">✕ 平庸答案</div>
+          <div class="answer-body"><p>「看日志，找到报错修掉。」</p><p>——崩溃中的容器 <code>kubectl logs</code> 默认看不到输出（要看 <code>-p</code>）；也没体现分层思路。</p></div>
+        </div>
+        <div class="answer good">
+          <div class="answer-head">✓ 加分答案 · 分层取证</div>
+          <div class="answer-body"><p>「先 <code>describe pod</code> 看 Events 确认是容器退出导致的循环（退出码很关键：137 多为 OOM，1/2 多为应用自身）。然后 <code>kubectl logs -p</code> 看上一个实例的输出；如果完全没有输出，说明进程启动即死，查命令与入口点。OOM 怀疑则看 <code>lastState.terminated.reason</code> 与内存 limit。需要现场时用 <code>kubectl debug</code> 附加临时容器保留文件系统检查。整个过程是『事件定性质、日志定原因、现场定细节』。」</p></div>
+        </div>
+      </div>
+
+      <h2 id="myths">常见误区</h2>
+      <div class="myth">
+        <div class="myth-q">误区一：排障先看日志</div>
+        <p class="myth-a">先看事件。容器没起来的 Pod 没有日志可看，而 Events 记录了调度、拉镜像、挂载、探针的每一步裁决。</p>
+      </div>
+      <div class="myth">
+        <div class="myth-q">误区二：kubectl logs 能看到崩溃容器的输出</div>
+        <p class="myth-a">默认看当前实例。崩溃重启中的要看 <code>-p</code>（previous）。不知道这个参数的人会在空输出前发呆。</p>
+      </div>
+      <div class="myth">
+        <div class="myth-q">误区三：删了重建能解决一切</div>
+        <p class="myth-a">它同时销毁了现场：事件、退出码、文件系统。先取证再动手；生产环境的「重启大法」应是被迫的最后手段。</p>
+      </div>
+
+      <h2 id="further">延伸</h2>
+      <ul>
+        <li><a href="https://kubernetes.io/docs/tasks/debug/" rel="noopener">官方文档 · Debugging</a></li>
+        <li>卡站对照表的完整版：<a href="03-birth-of-a-pod.html">03 · 一个 Pod 的诞生</a></li>
+      </ul>
+
+      <div class="mark-done">
+        <button type="button" data-chapter="12">读完本章，打个卡</button>
+      </div>
+
+      <nav class="chapter-nav" id="chapterNav" aria-label="章节导航"></nav>
+    </article>
+
+    <aside class="page-toc" id="pageToc" aria-label="本页目录"></aside>
+  </main>
+</div>
+
+<script src="assets/site.js"></script>
+<script src="assets/diagram.js"></script>
+<script src="assets/main.js"></script>
+</body>
+</html>

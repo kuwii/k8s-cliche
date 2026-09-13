@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>07 · 存储 · k8s-cliche</title>
+<meta name="description" content="PV / PVC / StorageClass 三层模型、动态供给、访问模式与回收策略。">
+<script>
+(function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+</script>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23326ce5' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23326ce5'/%3E%3C/svg%3E">
+</head>
+<body data-page="07">
+<a class="skip-link" href="#top">跳到正文</a>
+<div id="progress"></div>
+
+<header class="topbar">
+  <button class="icon-btn" id="navToggle" type="button" aria-label="打开目录">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+  </button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" style="color:var(--accent)">
+        <circle cx="32" cy="32" r="24" stroke-width="4"/>
+        <circle cx="32" cy="32" r="6" fill="currentColor" stroke="none"/>
+        <g stroke-width="4" stroke-linecap="round">
+          <line x1="32" y1="26" x2="32" y2="8"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(51.43 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(102.86 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(154.29 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(205.71 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(257.14 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(308.57 32 32)"/>
+        </g>
+      </svg>
+    </span>
+    k8s-cliche
+  </a>
+  <span class="topbar-chapter"></span>
+  <div class="topbar-spacer"></div>
+  <button class="icon-btn" id="themeToggle" type="button" title="切换深色 / 浅色主题" aria-label="切换主题">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4.5"/>
+      <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/>
+    </svg>
+  </button>
+</header>
+
+<div class="nav-scrim"></div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar" aria-label="章节目录">
+    <nav id="sidebarNav"></nav>
+  </aside>
+
+  <main class="main" id="top">
+    <article class="content">
+      <span class="chapter-eyebrow">专题 · 第 07 章</span>
+      <h1>存储</h1>
+      <p class="lede">容器的磁盘随容器消亡。PV/PVC 把「谁要存储」和「谁提供存储」拆开。</p>
+
+      <div class="tldr">
+        <div class="tldr-label">一句话答案</div>
+        <p>三层模型：<strong>PV</strong> 是存储资源本体（供给侧），<strong>PVC</strong> 是用户的申请单（需求侧），<strong>StorageClass</strong> 是「如何动态创建 PV」的配方。</p>
+        <p>Pod 只认 PVC，不认 PV——和代码只依赖接口不依赖实现是一个道理。</p>
+      </div>
+
+      <h2 id="why">问题：容器文件系统是临时的</h2>
+      <p>容器内的写入存在于可写层，容器删除即消失；Pod 重建（换节点）更是什么都不剩。数据库、上传文件、日志归档都需要<strong>独立于容器生命周期的存储</strong>。</p>
+
+      <h2 id="three-layers">三层模型</h2>
+      <figure class="diagram" id="fig-pvc">
+        <div class="diagram-canvas-wrap"></div>
+        <figcaption class="diagram-caption"><b>动态供给</b>：用户只写 PVC；StorageClass 指挥 provisioner 创建真实云盘并生成 PV 完成绑定</figcaption>
+      </figure>
+      <ul>
+        <li><strong>PersistentVolume</strong>：管理员预先创建、或由 provisioner 动态创建的存储资源。是对一块真实存储（云盘、NFS、Ceph）的抽象</li>
+        <li><strong>PersistentVolumeClaim</strong>：用户声明「我要多大、什么访问模式」。控制器拿它去匹配或创建 PV，完成 <strong>绑定（Bound）</strong></li>
+        <li><strong>StorageClass</strong>：描述「用什么 provisioner、什么参数创建 PV」。PVC 指定它，就能<strong>按需自动创建</strong> PV，无需管理员预先铺盘</li>
+      </ul>
+      <p>Pod 里这样用：</p>
+      <div class="code-block" data-lang="yaml">
+<pre><code>spec:
+  containers:
+    - name: db
+      volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: mysql-data   # 只引用 PVC，不关心背后是什么盘</code></pre>
+      </div>
+
+      <h2 id="access-modes">访问模式与回收策略</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>概念</th><th>取值</th><th>含义</th></tr></thead>
+          <tbody>
+            <tr><td rowspan="4">访问模式<br>（accessModes）</td><td>ReadWriteOnce（RWO）</td><td>可被<strong>单个节点</strong>读写（最常用；云盘通常如此）</td></tr>
+            <tr><td>ReadOnlyMany（ROX）</td><td>多节点只读</td></tr>
+            <tr><td>ReadWriteMany（RWX）</td><td>多节点读写（需要 NFS/Ceph 等共享存储支持）</td></tr>
+            <tr><td>ReadWriteOncePod</td><td>全集群仅单个 Pod 可挂载（比 RWO 更严）</td></tr>
+            <tr><td rowspan="2">回收策略<br>（reclaimPolicy）</td><td>Retain</td><td>PVC 删除后 PV 保留，数据还在，需人工清理</td></tr>
+            <tr><td>Delete</td><td>PVC 删除后<strong>连带删除底层存储</strong>——数据随之消失</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout danger">
+        <div class="callout-title">Delete 策略 = 删 PVC 即删数据</div>
+        <p>动态供给的 StorageClass 默认多为 Delete。误删一个 PVC，数据库文件就没了。生产环境要么改 Retain，要么确保备份独立于 PVC 生命周期。</p>
+      </div>
+
+      <h2 id="volume-types">volume 类型对照</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>类型</th><th>生命周期</th><th>用途</th></tr></thead>
+          <tbody>
+            <tr><td><code>emptyDir</code></td><td>与 Pod 同生共死</td><td>同 Pod 内容器共享的暂存区、缓存</td></tr>
+            <tr><td><code>hostPath</code></td><td>绑定在特定节点</td><td>仅 DaemonSet 类场景；Pod 漂移到别节点数据就「丢」了</td></tr>
+            <tr><td><code>persistentVolumeClaim</code></td><td>独立于 Pod</td><td>需要持久化的数据的标准答案</td></tr>
+            <tr><td><code>configMap</code> / <code>secret</code></td><td>跟随源对象更新</td><td>把配置/密钥以文件形式注入（见第 08 章）</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="csi">CSI 一句话</h2>
+      <p><strong>CSI（Container Storage Interface）</strong>是存储厂商接入 K8s 的标准插件接口——和 CRI 之于运行时、CNI 之于网络同构。云厂商/开源存储实现 CSI 驱动，K8s 就能「认识」它的盘。</p>
+
+      <h2 id="sts">与 StatefulSet 的配合</h2>
+      <p><code>volumeClaimTemplates</code> 让每个副本自动获得<strong>专属</strong> PVC：<code>data-web-0</code>、<code>data-web-1</code>……Pod 重建后按名字挂回自己那块盘。这是「稳定存储」保证的实现方式（第 05 章）。</p>
+
+      <h2 id="interview">面试官视角</h2>
+      <p><strong>Q：PV、PVC、StorageClass 的关系？</strong></p>
+      <div class="answer-compare">
+        <div class="answer bad">
+          <div class="answer-head">✕ 平庸答案</div>
+          <div class="answer-body"><p>「PV 是存储，PVC 是申请，StorageClass 是分类。」</p><p>——「分类」是错的方向：StorageClass 不是 PV 的分类标签，而是创建配方。</p></div>
+        </div>
+        <div class="answer good">
+          <div class="answer-head">✓ 加分答案</div>
+          <div class="answer-body"><p>「PV 和 PVC 是供需两侧：PVC 是申请单，PV 是资源本体，两者绑定后 Pod 经 PVC 使用存储，不直接接触 PV。StorageClass 描述如何动态创建 PV——指定 provisioner 和参数——PVC 引用它就能按需自动开盘，免去管理员预铺。另外两个关键属性：访问模式决定能挂几个节点，回收策略决定 PVC 删除后数据去留，Delete 策略下删 PVC 就是删数据。」</p></div>
+        </div>
+      </div>
+
+      <h2 id="myths">常见误区</h2>
+      <div class="myth">
+        <div class="myth-q">误区一：PVC 绑定成功 = 数据安全</div>
+        <p class="myth-a">绑定只说明盘挂上了。回收策略为 Delete 时，删 PVC 数据即消失。备份是另一件事。</p>
+      </div>
+      <div class="myth">
+        <div class="myth-q">误区二：RWO 的盘可以挂给多个 Pod</div>
+        <p class="myth-a">RWO 限制在单节点挂载。跨节点的第二个 Pod 会挂载失败；同节点多 Pod 共享 RWO 在某些实现下可行但属灰色地带，正解是 RWX 存储或拆分。</p>
+      </div>
+      <div class="myth">
+        <div class="myth-q">误区三：hostPath 是持久化方案</div>
+        <p class="myth-a">它把数据绑死在节点上：Pod 被调度到别节点就「丢」数据，节点磁盘故障即数据故障。除 DaemonSet 类场景外不要用。</p>
+      </div>
+
+      <h2 id="further">延伸</h2>
+      <ul>
+        <li><a href="https://kubernetes.io/docs/concepts/storage/" rel="noopener">官方文档 · Storage</a></li>
+        <li>有状态应用如何组织：<a href="05-workloads.html">05 · 工作负载</a> StatefulSet 一节</li>
+      </ul>
+
+      <div class="mark-done">
+        <button type="button" data-chapter="07">读完本章，打个卡</button>
+      </div>
+
+      <nav class="chapter-nav" id="chapterNav" aria-label="章节导航"></nav>
+    </article>
+
+    <aside class="page-toc" id="pageToc" aria-label="本页目录"></aside>
+  </main>
+</div>
+
+<script src="assets/site.js"></script>
+<script src="assets/diagram.js"></script>
+<script src="assets/main.js"></script>
+<script>
+/* 07 章 · 动态供给 */
+K8C.Diagram.mount('#fig-pvc', {
+  width: 860, height: 280,
+  nodes: [
+    { id:'pod', x:110, y:70,  w:130, h:48, label:'Pod', sub:'只引用 PVC' },
+    { id:'pvc', x:110, y:190, w:140, h:50, label:'PVC', sub:'申请单', color:'accent' },
+    { id:'pv',  x:400, y:190, w:140, h:50, label:'PV', sub:'资源本体', color:'accent' },
+    { id:'sc',  x:400, y:70,  w:160, h:48, label:'StorageClass', sub:'创建配方' },
+    { id:'prov',x:680, y:70,  w:150, h:48, label:'CSI provisioner', sub:'存储插件' },
+    { id:'disk',x:680, y:190, w:140, h:54, label:'真实云盘', kind:'store' }
+  ],
+  edges: [
+    { from:'pod',  to:'pvc',  label:'mount' },
+    { from:'pvc',  to:'pv',   label:'绑定 Bound' },
+    { from:'pvc',  to:'sc',   label:'指定', kind:'dashed' },
+    { from:'sc',   to:'prov', label:'调用' },
+    { from:'prov', to:'disk', label:'创建' },
+    { from:'pv',   to:'disk', label:'抽象自' }
+  ]
+});
+
+</script>
+</body>
+</html>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>09 · 调度与资源 · k8s-cliche</title>
+<meta name="description" content="requests / limits、QoS 与驱逐、过滤打分、亲和性、污点与容忍。">
+<script>
+(function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+</script>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23326ce5' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23326ce5'/%3E%3C/svg%3E">
+</head>
+<body data-page="09">
+<a class="skip-link" href="#top">跳到正文</a>
+<div id="progress"></div>
+
+<header class="topbar">
+  <button class="icon-btn" id="navToggle" type="button" aria-label="打开目录">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+  </button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" style="color:var(--accent)">
+        <circle cx="32" cy="32" r="24" stroke-width="4"/>
+        <circle cx="32" cy="32" r="6" fill="currentColor" stroke="none"/>
+        <g stroke-width="4" stroke-linecap="round">
+          <line x1="32" y1="26" x2="32" y2="8"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(51.43 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(102.86 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(154.29 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(205.71 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(257.14 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(308.57 32 32)"/>
+        </g>
+      </svg>
+    </span>
+    k8s-cliche
+  </a>
+  <span class="topbar-chapter"></span>
+  <div class="topbar-spacer"></div>
+  <button class="icon-btn" id="themeToggle" type="button" title="切换深色 / 浅色主题" aria-label="切换主题">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4.5"/>
+      <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/>
+    </svg>
+  </button>
+</header>
+
+<div class="nav-scrim"></div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar" aria-label="章节目录">
+    <nav id="sidebarNav"></nav>
+  </aside>
+
+  <main class="main" id="top">
+    <article class="content">
+      <span class="chapter-eyebrow">专题 · 第 09 章</span>
+      <h1>调度与资源</h1>
+      <p class="lede">两个问题：装不装得下（resources / QoS），放哪儿（filter / score / 亲和 / 污点）。</p>
+
+      <div class="tldr">
+        <div class="tldr-label">一句话答案</div>
+        <p><code>requests</code> 是<strong>调度依据与最低保障</strong>，<code>limits</code> 是<strong>使用上限</strong>；两者组合决定 QoS 等级，QoS 决定节点压力时<strong>谁先被驱逐</strong>。 placement 侧则是：过滤（硬性条件）→ 打分（软性偏好）→ 绑定。</p>
+      </div>
+
+      <h2 id="requests-limits">requests 与 limits 的准确语义</h2>
+      <div class="code-block" data-lang="yaml">
+<pre><code>resources:
+  requests:
+    cpu: 250m       # 0.25 核；调度器按它找放得下的节点
+    memory: 256Mi   # 节点内存「账面」扣减它
+  limits:
+    cpu: 1000m      # 超过就被节流（throttle），不杀
+    memory: 512Mi   # 超过就 OOM Kill</code></pre>
+      </div>
+      <ul>
+        <li><strong>CPU 是可压缩资源</strong>：超 limit 的表现是<strong>被节流</strong>（CFS quota，进程变慢但不死）</li>
+        <li><strong>内存是不可压缩资源</strong>：超 limit 的表现是<strong>被 OOM Kill</strong>（进程死）</li>
+        <li>requests 只影响<strong>调度时的账面计算</strong>和 cgroup 的最低份额；节点超卖（requests 之和 &gt; 实际容量）是常态，赌的是大家不同时用满</li>
+      </ul>
+      <div class="callout info">
+        <div class="callout-title">社区实践争议点</div>
+        <p>不少团队<strong>不设 CPU limit</strong>：CPU 节流造成的延迟毛刺比「多占一点 CPU」危害更大，而 CPU 超用不会压垮节点。内存 limit 则普遍设置（防止单 Pod 吃垮节点）。面试时能说出这个权衡，比背定义强。</p>
+      </div>
+
+      <h2 id="qos">QoS 三档与驱逐顺序</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>等级</th><th>条件</th><th>节点内存压力时</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Guaranteed</strong></td><td>所有容器 cpu/memory 的 requests == limits</td><td>最后被驱逐</td></tr>
+            <tr><td><strong>Burstable</strong></td><td>设了 requests 但不满足 Guaranteed</td><td>居中</td></tr>
+            <tr><td><strong>BestEffort</strong></td><td>什么都没设</td><td><strong>最先被驱逐</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>驱逐（Eviction）</strong>是 kubelet 在节点资源压力下的主动行为：按 QoS 等级 + 超用比例挑 Pod 杀掉腾空间，Pod 状态变为 <code>Evicted</code>。它与 OOM Kill 的区别：OOM Kill 是<strong>单容器</strong>超自己的 limit；驱逐是<strong>节点级</strong>压力下的取舍。</p>
+
+      <h2 id="pipeline">放置：过滤 → 打分</h2>
+      <figure class="diagram" id="fig-sched">
+        <div class="diagram-canvas-wrap"></div>
+        <figcaption class="diagram-caption"><b>调度两阶段</b>：Filter 是硬性淘汰（不满足即出局），Score 是软性排序（满足者比优劣）</figcaption>
+      </figure>
+      <ul>
+        <li><strong>Filter 的依据</strong>：节点剩余资源是否 ≥ requests、污点是否被容忍、nodeSelector / 节点亲和的硬性要求、卷能否挂载</li>
+        <li><strong>Score 的依据</strong>：资源均衡度、亲和的软性偏好、拓扑分布等</li>
+      </ul>
+
+      <h2 id="affinity">表达 placement 意愿的四种手段</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>手段</th><th>粒度</th><th>硬/软</th></tr></thead>
+          <tbody>
+            <tr><td><code>nodeSelector</code></td><td>节点标签精确匹配</td><td>硬（最简单）</td></tr>
+            <tr><td><code>nodeAffinity</code></td><td>节点标签表达式</td><td>required（硬）/ preferred（软）</td></tr>
+            <tr><td><code>podAffinity / podAntiAffinity</code></td><td>相对<strong>其他 Pod</strong> 的位置（同区/避开）</td><td>required / preferred</td></tr>
+            <tr><td><code>topologySpreadConstraints</code></td><td>跨拓扑域（zone/节点）的<strong>均匀度</strong></td><td>maxSkew 控制</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>podAntiAffinity 说「别和我同节点」，topologySpreadConstraints 说「各 zone 数量差不能超过 1」——后者是「分布均匀」的直接表达，前者只是 pairwise 的排斥。</p>
+
+      <h2 id="taints">污点与容忍：节点拒客的艺术</h2>
+      <p>亲和性是 Pod 说「我想去哪」；<strong>污点是节点说「我不想接谁」</strong>。节点打污点，Pod 带相应容忍才能进入。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>effect</th><th>含义</th></tr></thead>
+          <tbody>
+            <tr><td><code>NoSchedule</code></td><td>新 Pod 不调度上来（已有的不动）</td></tr>
+            <tr><td><code>PreferNoSchedule</code></td><td>尽量不调度上来（软性）</td></tr>
+            <tr><td><code>NoExecute</code></td><td>不容忍的 Pod <strong>立刻被驱逐</strong>（已有的也赶）</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>control-plane 节点默认带污点，所以业务 Pod 不会落上去；节点故障时 Node 控制器会给它打 <code>node.kubernetes.io/unreachable</code> 的 NoExecute 污点——<strong>这就是「节点挂了 Pod 被赶走重建」的机制</strong>。</p>
+
+      <h2 id="interview">面试官视角</h2>
+      <p><strong>Q：requests 和 limits 的区别？怎么设置？</strong></p>
+      <div class="answer-compare">
+        <div class="answer bad">
+          <div class="answer-head">✕ 平庸答案</div>
+          <div class="answer-body"><p>「requests 是最小值，limits 是最大值。」</p><p>——没说清「最小」对谁而言（调度账面）、CPU 与内存超限的不同后果、QoS 与驱逐的关联。</p></div>
+        </div>
+        <div class="answer good">
+          <div class="answer-head">✓ 加分答案</div>
+          <div class="answer-body"><p>「requests 是调度器选节点的依据，也是 cgroup 的最低保障；limits 是上限。关键区别在超限后果：CPU 超 limit 被节流、变慢不死；内存超 limit 被 OOM Kill。两者组合决定 QoS 等级，而 QoS 决定节点内存压力时的驱逐顺序——BestEffort 先死，Guaranteed 最后死。设置上我倾向 requests 贴近真实 P99 用量、内存设 limit 防吃垮节点、CPU limit 谨慎或不设以避免节流毛刺。」</p></div>
+        </div>
+      </div>
+
+      <h2 id="myths">常见误区</h2>
+      <div class="myth">
+        <div class="myth-q">误区一：limits 设得越大越安全</div>
+        <p class="myth-a">内存 limit 过大 = 单 Pod 可能吃垮节点；且 requests 低 limits 高会落入 Burstable，驱逐时比 Guaranteed 先死。安全来自匹配，不来自大。</p>
+      </div>
+      <div class="myth">
+        <div class="myth-q">误区二：写了 preferred 亲和性就一定会遵守</div>
+        <p class="myth-a">preferred 是打分偏好，资源紧张时完全可能被忽略。硬约束用 required，但 required 写错会导致 Pod 永远 Pending。</p>
+      </div>
+      <div class="myth">
+        <div class="myth-q">误区三：Pod 被 Evicted = 应用有 bug</div>
+        <p class="myth-a">驱逐是节点压力下的资源决策，与应用对错无关。查 <code>kubectl describe node</code> 的压力条件与 QoS 分布，而不是查代码。</p>
+      </div>
+
+      <h2 id="further">延伸</h2>
+      <ul>
+        <li><a href="https://kubernetes.io/docs/concepts/scheduling-eviction/" rel="noopener">官方文档 · Scheduling &amp; Eviction</a></li>
+        <li>调度在 Pod 旅程中的位置：<a href="03-birth-of-a-pod.html">03 · 一个 Pod 的诞生</a> ③ 站</li>
+      </ul>
+
+      <div class="mark-done">
+        <button type="button" data-chapter="09">读完本章，打个卡</button>
+      </div>
+
+      <nav class="chapter-nav" id="chapterNav" aria-label="章节导航"></nav>
+    </article>
+
+    <aside class="page-toc" id="pageToc" aria-label="本页目录"></aside>
+  </main>
+</div>
+
+<script src="assets/site.js"></script>
+<script src="assets/diagram.js"></script>
+<script src="assets/main.js"></script>
+<script>
+/* 09 章 · 调度两阶段 */
+K8C.Diagram.mount('#fig-sched', {
+  width: 880, height: 190,
+  nodes: [
+    { id:'all',  x:100, y:80, w:140, h:52, label:'全部节点' },
+    { id:'f',    x:320, y:80, w:160, h:52, label:'过滤 Filter', sub:'资源 / 污点 / 亲和硬条件', color:'accent' },
+    { id:'cand', x:540, y:80, w:140, h:52, label:'候选节点' },
+    { id:'s',    x:750, y:80, w:160, h:52, label:'打分 Score', sub:'均衡 / 偏好排序', color:'accent' }
+  ],
+  edges: [
+    { from:'all',  to:'f',    label:'淘汰不满足者' },
+    { from:'f',    to:'cand' },
+    { from:'cand', to:'s',    label:'选最高分绑定' }
+  ],
+  notes: [
+    { x:440, y:168, text:'Filter 是「能不能」，Score 是「好不好」', color:'mute' }
+  ]
+});
+
+</script>
+</body>
+</html>

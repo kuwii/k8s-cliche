@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>03 · 一个 Pod 的诞生 · k8s-cliche</title>
+<meta name="description" content="从 kubectl apply 到容器 Ready 的完整旅程：认证鉴权准入、etcd 落库、调度绑定、kubelet 执行、CRI/CNI、探针与状态回写。全书主轴。">
+<script>
+(function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+</script>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23326ce5' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23326ce5'/%3E%3C/svg%3E">
+</head>
+<body data-page="03">
+<a class="skip-link" href="#top">跳到正文</a>
+<div id="progress"></div>
+
+<header class="topbar">
+  <button class="icon-btn" id="navToggle" type="button" aria-label="打开目录">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+  </button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" style="color:var(--accent)">
+        <circle cx="32" cy="32" r="24" stroke-width="4"/>
+        <circle cx="32" cy="32" r="6" fill="currentColor" stroke="none"/>
+        <g stroke-width="4" stroke-linecap="round">
+          <line x1="32" y1="26" x2="32" y2="8"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(51.43 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(102.86 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(154.29 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(205.71 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(257.14 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(308.57 32 32)"/>
+        </g>
+      </svg>
+    </span>
+    k8s-cliche
+  </a>
+  <span class="topbar-chapter"></span>
+  <div class="topbar-spacer"></div>
+  <button class="icon-btn" id="themeToggle" type="button" title="切换深色 / 浅色主题" aria-label="切换主题">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4.5"/>
+      <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/>
+    </svg>
+  </button>
+</header>
+
+<div class="nav-scrim"></div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar" aria-label="章节目录">
+    <nav id="sidebarNav"></nav>
+  </aside>
+
+  <main class="main" id="top">
+    <article class="content">
+
+      <span class="chapter-eyebrow">主线 · 第 03 章 · 全书主轴</span>
+      <h1>一个 Pod 的诞生</h1>
+      <p class="lede">从你敲下 <code>kubectl apply</code>，到容器真正跑起来接流量——中间发生了什么。</p>
+
+      <div class="tldr">
+        <div class="tldr-label">一句话答案</div>
+        <p>一份 YAML 的旅程：<strong>kubectl → apiserver（三道关卡）→ etcd 落库 → scheduler 绑定节点 → 该节点 kubelet 接单 → CRI 拉镜像起容器（CNI 配网络）→ 探针通过 → 状态回写 → Service 发现它</strong>。</p>
+        <p>全程<strong>没有任何两个组件直接对话</strong>。它们只是轮流读写 API Server 上的同一份记录。这一章是第 00 章四条模型的同一次演出。</p>
+      </div>
+
+      <!-- ==================== 为什么 ==================== -->
+      <h2 id="why">为什么这一章是主轴</h2>
+      <p>前面三章给了你思想和零件。这一章把零件装起来跑一遍。</p>
+      <p>这条链路穿过了几乎所有核心组件，也解释了几乎所有常见故障现象：<strong>Pending、ContainerCreating、ImagePullBackOff、CrashLoopBackOff、Ready 0/1——每一个都是旅程在某一站卡住了。</strong>读懂旅程，故障排查就从「背现象」变成「查站点」。</p>
+
+      <!-- ==================== 出发前 ==================== -->
+      <h2 id="before">出发之前：你提交的到底是什么</h2>
+      <p><code>kubectl apply -f deployment.yaml</code> 时，kubectl 做的事很简单：读 YAML，把它转换成一次对 API Server 的 <strong>REST 请求</strong>。</p>
+      <p>YAML 只是序列化格式。真正被提交的是一个 <strong>API 对象</strong>（第 00 章模型二）：带 <code>apiVersion / kind / metadata / spec</code> 的结构化数据。kubectl 本身不理解调度、不理解容器——它只是个 HTTP 客户端。</p>
+      <div class="callout note">
+        <div class="callout-title">顺带解开一个常见困惑</div>
+        <p><code>apply</code> 与 <code>create</code> 的区别不在「格式」而在语义：<code>create</code> 是「新建这个对象」，已存在就报错；<code>apply</code> 是「让集群状态等于这份声明」，存在则更新。后者才是声明式的用法，也是 GitOps 的基础动作。</p>
+      </div>
+
+      <!-- ==================== 九站 ==================== -->
+      <h2 id="journey">旅程的九个站点</h2>
+
+      <h3 id="stage-1">① 三道关卡：认证 → 鉴权 → 准入</h3>
+      <p>请求到达 API Server，先过三关：</p>
+      <figure class="diagram" id="fig-admission">
+        <div class="diagram-canvas-wrap"></div>
+        <figcaption class="diagram-caption"><b>API Server 的请求处理管线</b>：任何一关不过，请求到此为止</figcaption>
+      </figure>
+      <ul>
+        <li><strong>认证（Authentication）</strong>：你是谁？证书、Token、ServiceAccount……</li>
+        <li><strong>鉴权（Authorization）</strong>：你被允许做这个动作吗？RBAC 规则在这里生效</li>
+        <li><strong>准入（Admission）</strong>：这个请求合规吗？分两阶段——<strong>mutating</strong>（可以改写请求，比如注入默认值、sidecar）在前，<strong>validating</strong>（只判断接受或拒绝）在后</li>
+      </ul>
+      <p>面试常追问顺序：<strong>mutating 必须在 validating 之前</strong>——先改完再校验，校验的才是最终形态。</p>
+
+      <h3 id="stage-2">② 落库：Pod 诞生，但还只是个账本条目</h3>
+      <p>过了三关，对象被写入 etcd。<strong>此刻 Pod「存在」了</strong>——但只存在于账本里：没有节点、没有容器、没有 IP。</p>
+      <p>它的状态是 <code>Pending</code>，<code>spec.nodeName</code> 为空。如果你这时 <code>kubectl get pod</code>，看到的就是这一站。</p>
+
+      <h3 id="stage-3">③ 调度器接单：过滤 → 打分 → 绑定</h3>
+      <p>scheduler 一直 watch 着「<code>nodeName</code> 为空的 Pod」。发现新 Pod 后：</p>
+      <ol>
+        <li><strong>过滤（Filter）</strong>：剔除不满足条件的节点——资源不够、污点不容忍、节点选择器不匹配</li>
+        <li><strong>打分（Score）</strong>：给候选节点排序——资源均衡、亲和性偏好等</li>
+        <li><strong>绑定（Bind）</strong>：把选中的节点写回 Pod 的 <code>spec.nodeName</code></li>
+      </ol>
+      <div class="callout warn">
+        <div class="callout-title">关键认知</div>
+        <p>scheduler 到此就<strong>下班了</strong>。它没有启动任何东西，只是写了一个字段。「调度」在 K8s 里的全部含义就是<strong>这一次绑定</strong>。</p>
+      </div>
+
+      <h3 id="stage-4">④ kubelet 接单：靠 watch，不靠通知</h3>
+      <p>没有任何人「通知」kubelet。每个节点的 kubelet 都在 watch「<code>nodeName</code> 等于我的 Pod」。绑定写入的那一瞬，目标节点的 kubelet 看到了变化，把活领走。</p>
+      <p>这是第 00 章模型四的标准动作：协作 = 各自监听同一份数据。</p>
+
+      <h3 id="stage-5">⑤ CRI：拉镜像、建沙箱、起容器</h3>
+      <p>kubelet 调用容器运行时（CRI 接口），运行时依次：</p>
+      <ol>
+        <li>拉取镜像（不存在或拉不到，就卡在这里 → <code>ImagePullBackOff</code>）</li>
+        <li>创建 <strong>Pod 沙箱（sandbox）</strong>——Pod 的网络命名空间就在这时建立，<strong>CNI 插件在此给 Pod 分配 IP</strong></li>
+        <li>按顺序启动 init 容器，再启动主容器</li>
+      </ol>
+      <p>注意 IP 是<strong>沙箱创建时</strong>就有的，早于容器启动。Pod 的 IP 属于沙箱，容器共享它——这解释了「同 Pod 内容器共享网络」。</p>
+
+      <h3 id="stage-6">⑥ 探针上岗</h3>
+      <p>容器跑起来后，kubelet 按声明执行探针：</p>
+      <ul>
+        <li><strong>startupProbe</strong>：允许慢启动，通过前其他探针不工作</li>
+        <li><strong>livenessProbe</strong>：失败 → 重启容器（「它还活着吗」）</li>
+        <li><strong>readinessProbe</strong>：失败 → 从 Service 后端摘除（「它能接客吗」）</li>
+      </ul>
+      <p>两者区别是高频考点：<strong>liveness 管生死，readiness 管流量</strong>。readiness 失败不会重启容器，只会让它暂时不接流量。</p>
+
+      <h3 id="stage-7">⑦ 状态回写：Ready = true</h3>
+      <p>kubelet 持续观察本机容器，把结果写回 API Server：容器状态、Pod IP、<code>Ready</code> 条件。<strong>到此，账本上的记录第一次与现实一致。</strong></p>
+
+      <h3 id="stage-8">⑧ EndpointSlice 更新</h3>
+      <p>EndpointSlice 控制器 watch 到「某个 Ready 的 Pod 匹配某 Service 的选择器」，把它的 IP:Port 加入该 Service 的后端列表。</p>
+      <p>下一跳开始，Service 的负载均衡规则里有了这个 Pod——<strong>它正式可以接客了</strong>。</p>
+
+      <h3 id="stage-9">⑨ 之后：永不停歇的循环</h3>
+      <p>旅程没有终点。kubelet 继续汇报、探针继续探测、控制器继续调谐。Pod 的「一生」就是第 00 章那个循环的一次实例化。</p>
+
+      <!-- ==================== 动画复盘 ==================== -->
+      <h2 id="replay">复盘：看它走一遍</h2>
+      <figure class="diagram" id="fig-journey">
+        <div class="diagram-canvas-wrap"></div>
+        <div class="diagram-controls-slot"></div>
+        <figcaption class="diagram-caption"><b>一个 Pod 的诞生</b>：点击播放，跟随脉冲走完九个站点。注意——脉冲从不直接在两个组件之间跳，它总是经过 API Server 这份共享记录</figcaption>
+      </figure>
+
+      <!-- ==================== 卡站对照 ==================== -->
+      <h2 id="stuck">卡在哪一站 = 你看到什么</h2>
+      <p><code>kubectl get pods</code> 的每个异常状态，都是旅程在某一站卡住的别名：</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>你看到的</th><th>卡住的站点</th><th>常见原因</th></tr></thead>
+          <tbody>
+            <tr><td><code>Pending</code></td><td>③ 调度</td><td>资源不足、污点不容忍、PVC 未绑定、没有满足选择器的节点</td></tr>
+            <tr><td><code>ContainerCreating</code></td><td>⑤ 镜像 / 卷 / 网络</td><td>镜像拉取中或失败、Secret 缺失、存储卷挂载失败、CNI 未就绪</td></tr>
+            <tr><td><code>ErrImagePull</code> / <code>ImagePullBackOff</code></td><td>⑤ 拉镜像</td><td>镜像名写错、无拉取权限、私有仓库未配 imagePullSecret</td></tr>
+            <tr><td><code>CrashLoopBackOff</code></td><td>⑤ 之后容器启动</td><td>进程立即退出：命令写错、缺配置、依赖连不上、OOM</td></tr>
+            <tr><td><code>Running</code> 但 <code>READY 0/1</code></td><td>⑥⑦ readiness</td><td>探针配置过苛、端口没监听、依赖服务未就绪</td></tr>
+            <tr><td><code>Terminating</code> 卡住</td><td>优雅终止阶段</td><td>finalizer 未移除、进程不响应 SIGTERM</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout tip">
+        <div class="callout-title">排查心法</div>
+        <p>先问「卡在哪一站」，再问「为什么」。<code>kubectl describe pod</code> 看事件（Events），<code>kubectl logs</code> 看容器输出——前者对应旅程的调度 / 拉取 / 挂载段，后者对应容器内部段。两张片子拍完，九成问题现形。</p>
+      </div>
+
+      <!-- ==================== 重启不走全流程 ==================== -->
+      <h2 id="restart">一个重要澄清：容器崩溃重启，不走这条旅程</h2>
+      <p>容器崩了被重启，是 <strong>kubelet 与运行时的本地行为</strong>（依据 <code>restartPolicy</code>）：不经过 scheduler，不重新调度，IP 通常不变（沙箱还在）。</p>
+      <p>只有当 <strong>Pod 对象本身被重建</strong>——节点故障被驱逐、Deployment 滚动更新、被人 delete——才会重新走完整旅程，拿到全新的 IP 和（可能的）全新节点。</p>
+      <p>这个区分解释了为什么「Pod IP 会变」和「容器重启 IP 不变」可以同时为真。</p>
+
+      <hr class="sep">
+
+      <!-- ==================== 面试官视角 ==================== -->
+      <h2 id="interview">面试官视角</h2>
+      <p><strong>Q：详细描述从 kubectl apply 到 Pod Ready 的完整流程。</strong></p>
+      <p>这是架构类面试的压轴题，考的是能否把组件串成因果链。</p>
+
+      <div class="answer-compare">
+        <div class="answer bad">
+          <div class="answer-head">✕ 平庸答案 · 组件流水账</div>
+          <div class="answer-body"><p>「kubectl 发给 apiserver，存到 etcd，scheduler 调度到节点，kubelet 启动容器，然后就好了。」</p><p>——骨架对，但每个关节都是糊的：准入呢？绑定是什么意思？CNI 在哪一步？Ready 是谁写的？</p></div>
+        </div>
+        <div class="answer good">
+          <div class="answer-head">✓ 加分答案 · 带关键机制的因果链</div>
+          <div class="answer-body">
+            <p>「分九步。kubectl 把 YAML 转成 REST 请求发给 apiserver；apiserver 依次做认证、鉴权、准入——准入里 mutating 在 validating 之前——通过后写入 etcd，此刻 Pod 诞生但 <code>nodeName</code> 为空，状态 Pending。</p>
+            <p>scheduler watch 到未绑定的 Pod，过滤、打分后把 <code>nodeName</code> 写回——注意它只做绑定，不启动任何东西。目标节点的 kubelet 靠 watch 发现自己有活，通过 CRI 让运行时拉镜像、创建 Pod 沙箱，CNI 在沙箱创建时分配 IP，然后启动 init 与主容器。</p>
+            <p>容器起来后探针开始工作；readiness 通过、kubelet 把 Ready 状态写回 apiserver；EndpointSlice 控制器随即把这个 Pod 加入 Service 后端，开始接流量。</p>
+            <p>整条链上没有任何两个组件直接通信，全部通过读写 API Server 上的共享记录协作——这也是为什么控制平面短暂故障时，已运行的 Pod 不受影响。」</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== 常见误区 ==================== -->
+      <h2 id="myths">常见误区</h2>
+
+      <div class="myth">
+        <div class="myth-q">误区一：scheduler 负责启动容器</div>
+        <p class="myth-a">scheduler 只写 <code>nodeName</code> 一个字段。启动是 kubelet + 运行时的事。两者无直接通信。</p>
+      </div>
+
+      <div class="myth">
+        <div class="myth-q">误区二：kubectl apply 返回成功 = Pod 跑起来了</div>
+        <p class="myth-a">返回成功只代表通过了第 ① 站、完成了第 ② 站落库。后面七站全是异步的，任何一站都可能失败。确认要靠 <code>kubectl rollout status</code> 或观察 Ready。</p>
+      </div>
+
+      <div class="myth">
+        <div class="myth-q">误区三：kubelet 从 etcd 拉取自己的配置 / YAML</div>
+        <p class="myth-a">kubelet 只与 apiserver 通信（唯一入口原则）。它 watch 到的是 Pod <strong>对象</strong>，不是 YAML 文件；YAML 只是你提交时的序列化形式。</p>
+      </div>
+
+      <div class="myth">
+        <div class="myth-q">误区四：容器每次重启都走完整调度流程</div>
+        <p class="myth-a">崩溃重启是 kubelet / 运行时依据 <code>restartPolicy</code> 的本地行为，不经过 scheduler。只有 Pod 对象被重建才重走全流程。</p>
+      </div>
+
+      <div class="myth">
+        <div class="myth-q">误区五：Service 访问不通，一定是 Service 配错了</div>
+        <p class="myth-a">高频真凶是 Pod 没 Ready：readiness 探针失败 → Pod 不进 EndpointSlice → Service 后端为空。先 <code>kubectl get endpoints</code>，再回头查探针。</p>
+      </div>
+
+      <!-- ==================== 延伸 ==================== -->
+      <h2 id="further">延伸</h2>
+      <ul>
+        <li><a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/" rel="noopener">官方文档 · Pod Lifecycle</a></li>
+        <li><a href="https://kubernetes.io/docs/concepts/architecture/cloud-controller/" rel="noopener">官方文档 · 组件交互细节</a></li>
+        <li>主线完结。接下来按兴趣进入专题：<a href="06-networking.html">06 · 网络</a> 与 <a href="09-scheduling-and-resources.html">09 · 调度与资源</a>（施工中）是本章两段的深挖</li>
+      </ul>
+
+      <div class="mark-done">
+        <button type="button" data-chapter="03">读完本章，打个卡</button>
+      </div>
+
+      <nav class="chapter-nav" id="chapterNav" aria-label="章节导航"></nav>
+
+    </article>
+
+    <aside class="page-toc" id="pageToc" aria-label="本页目录"></aside>
+  </main>
+</div>
+
+<script src="assets/site.js"></script>
+<script src="assets/diagram.js"></script>
+<script src="assets/main.js"></script>
+<script>
+/* 图 1：API Server 请求管线 */
+K8C.Diagram.mount('#fig-admission', {
+  width: 900, height: 150,
+  nodes: [
+    { id:'req',   x:60,  y:75, w:100, h:48, label:'请求' },
+    { id:'authn', x:195, y:75, w:110, h:48, label:'认证', sub:'Authentication' },
+    { id:'authz', x:330, y:75, w:110, h:48, label:'鉴权', sub:'Authorization' },
+    { id:'mut',   x:482, y:75, w:130, h:48, label:'准入 · 变更', sub:'Mutating' },
+    { id:'val',   x:640, y:75, w:130, h:48, label:'准入 · 校验', sub:'Validating' },
+    { id:'etcd',  x:800, y:75, w:110, h:52, label:'etcd', sub:'落库', kind:'store' }
+  ],
+  edges: [
+    { from:'req',   to:'authn', label:'你是谁', labelDy:-26 },
+    { from:'authn', to:'authz', label:'允许吗', labelDy:-26 },
+    { from:'authz', to:'mut',   label:'先改写', labelDy:-26 },
+    { from:'mut',   to:'val',   label:'再校验', labelDy:-26 },
+    { from:'val',   to:'etcd',  label:'接受',   labelDy:-26 }
+  ]
+});
+
+/* 图 2：Pod 诞生全旅程（9 步动画） */
+K8C.Diagram.mount('#fig-journey', {
+  width: 900, height: 560,
+  nodes: [
+    { id:'kubectl', x:100, y:70,  w:130, h:50, label:'kubectl', sub:'你' },
+    { id:'api',     x:430, y:70,  w:180, h:56, label:'API Server', sub:'三关 + 共享记录', kind:'hub' },
+    { id:'etcd',    x:760, y:70,  w:130, h:58, label:'etcd', sub:'账本', kind:'store' },
+    { id:'sched',   x:100, y:265, w:160, h:52, label:'调度器', sub:'过滤 → 打分 → 绑定' },
+    { id:'kubelet', x:430, y:265, w:170, h:52, label:'kubelet', sub:'node-2 的代理人' },
+    { id:'svc',     x:760, y:265, w:160, h:52, label:'Service', sub:'EndpointSlice 后端', color:'ok' },
+    { id:'runtime', x:400, y:450, w:180, h:58, label:'容器运行时', sub:'CRI：镜像 / 沙箱 / 容器' },
+    { id:'cni',     x:690, y:450, w:150, h:52, label:'CNI 插件', sub:'沙箱创建时配 IP' }
+  ],
+  edges: [
+    { from:'kubectl', to:'api',     label:'① apply' },
+    { from:'api',     to:'etcd',    kind:'bidir', label:'② 落库' },
+    { from:'api',     to:'sched',   bow: 9, label:'③ watch', labelDx:-58, labelDy:-24 },
+    { from:'sched',   to:'api',     bow: 9, label:'④ 写回 nodeName', labelDx:58, labelDy:24 },
+    { from:'api',     to:'kubelet', bow: 9, label:'⑤ watch', labelDx:-52 },
+    { from:'kubelet', to:'runtime', label:'⑥ CRI' },
+    { from:'runtime', to:'cni',     label:'⑦ 配网络' },
+    { from:'kubelet', to:'api',     bow: 9, label:'⑧ 回写 Ready', labelDx:56 },
+    { from:'api',     to:'svc',     label:'⑨ 后端更新' }
+  ],
+  steps: [
+    { from:'kubectl', to:'api',     label:'① kubectl apply：YAML 变成 REST 请求，过认证 / 鉴权 / 准入三关', dur:1200 },
+    { from:'api',     to:'etcd',    label:'② 落库：Pod 诞生 —— Pending，nodeName 为空，还只是账本条目', dur:1100 },
+    { from:'api',     to:'sched',   label:'③ 调度器 watch 到未绑定的 Pod，开始过滤与打分', dur:1100 },
+    { from:'sched',   to:'api',     label:'④ 写回绑定结果：nodeName = node-2（调度器只写答案，不动手）', dur:1100 },
+    { from:'api',     to:'kubelet', label:'⑤ node-2 的 kubelet watch 到「分给自己的 Pod」，接单', dur:1100 },
+    { from:'kubelet', to:'runtime', label:'⑥ CRI：拉镜像 → 创建 Pod 沙箱 → 启动 init 与主容器', dur:1300 },
+    { from:'runtime', to:'cni',     label:'⑦ 沙箱创建时 CNI 配好网络 —— Pod 拿到 IP（早于容器启动）', dur:1100 },
+    { from:'kubelet', to:'api',     label:'⑧ 探针通过，kubelet 回写状态：Ready = true', dur:1100 },
+    { from:'api',     to:'svc',     label:'⑨ EndpointSlice 控制器把它加入 Service 后端 —— 开始接客', dur:1200 }
+  ]
+});
+</script>
+</body>
+</html>

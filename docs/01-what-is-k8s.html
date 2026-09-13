@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>01 · K8s 是什么 · k8s-cliche</title>
+<meta name="description" content="Kubernetes 解决什么问题、和 Docker 是什么关系、什么场景该用（和不该用）。">
+<script>
+(function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+</script>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23326ce5' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23326ce5'/%3E%3C/svg%3E">
+</head>
+<body data-page="01">
+<a class="skip-link" href="#top">跳到正文</a>
+<div id="progress"></div>
+
+<header class="topbar">
+  <button class="icon-btn" id="navToggle" type="button" aria-label="打开目录">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+  </button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" style="color:var(--accent)">
+        <circle cx="32" cy="32" r="24" stroke-width="4"/>
+        <circle cx="32" cy="32" r="6" fill="currentColor" stroke="none"/>
+        <g stroke-width="4" stroke-linecap="round">
+          <line x1="32" y1="26" x2="32" y2="8"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(51.43 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(102.86 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(154.29 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(205.71 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(257.14 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(308.57 32 32)"/>
+        </g>
+      </svg>
+    </span>
+    k8s-cliche
+  </a>
+  <span class="topbar-chapter"></span>
+  <div class="topbar-spacer"></div>
+  <button class="icon-btn" id="themeToggle" type="button" title="切换深色 / 浅色主题" aria-label="切换主题">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4.5"/>
+      <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/>
+    </svg>
+  </button>
+</header>
+
+<div class="nav-scrim"></div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar" aria-label="章节目录">
+    <nav id="sidebarNav"></nav>
+  </aside>
+
+  <main class="main" id="top">
+    <article class="content">
+
+      <span class="chapter-eyebrow">主线 · 第 01 章</span>
+      <h1>K8s 是什么</h1>
+      <p class="lede">在学「怎么用」之前，先搞清楚「它凭什么存在」。</p>
+
+      <div class="tldr">
+        <div class="tldr-label">一句话答案</div>
+        <p>Kubernetes 是一个<strong>声明式的容器编排系统</strong>：你告诉它「我想要什么状态」，它负责在一群机器上把容器跑起来、维持住、坏了修好、流量来了扩容。</p>
+        <p>它不是 Docker 的竞争者，而是 Docker 造出来的容器<strong>多到单机管不过来之后</strong>的答案。</p>
+      </div>
+
+      <!-- ==================== 为什么 ==================== -->
+      <h2 id="why">为什么需要这一章</h2>
+      <p>「容器编排平台」这个官方定义几乎不携带信息。什么叫编排？编什么？排什么？</p>
+      <p>这一章从问题出发：先看清楚没有 K8s 的世界长什么样、痛在哪里，K8s 的每个设计就都有了着落。<strong>知道它解决什么问题，比记住它有什么功能重要得多。</strong></p>
+
+      <!-- ==================== 演进 ==================== -->
+      <h2 id="evolution">从一台机器说起：问题是怎么长出来的</h2>
+
+      <h3 id="pre-container">容器之前</h3>
+      <p><strong>物理机时代</strong>：一个应用占一台机器。资源浪费（大部分机器利用率不到 15%）、部署慢（装机、装环境、上线以天计）、环境不一致（「在我电脑上是好的」）。</p>
+      <p><strong>虚拟化时代</strong>：一台物理机切出多个虚拟机（VM）。隔离好了，但每个 VM 是一个完整操作系统——GB 级体积、分钟级启动，依旧笨重。</p>
+      <p><strong>容器时代</strong>：Docker 把「容器」变成了易用品。容器共享主机内核，只是一个被隔离的进程——MB 级体积、秒级启动。更重要的是<strong>镜像（Image）</strong>：把应用和它的整个运行环境打包成一个标准件，在任何机器上跑出来都一样。</p>
+      <p>「在我电脑上是好的」这个问题，到此为止了。</p>
+
+      <h3 id="four-questions">但新的问题来了</h3>
+      <p>容器太便宜了，于是你有了几十个容器、十几台机器。然后四个问题接踵而至：</p>
+
+      <figure class="diagram" id="fig-questions">
+        <div class="diagram-canvas-wrap"></div>
+        <figcaption class="diagram-caption"><b>容器规模化之后的四个问题</b>，以及 K8s 给出的对应机制</figcaption>
+      </figure>
+
+      <ol>
+        <li><strong>放哪？</strong>十几台机器，每个容器该跑在哪一台？要考虑资源余量、故障分散、机架隔离……靠人排班表是不现实的。</li>
+        <li><strong>怎么互相找到？</strong>容器随时可能死掉重建，IP 每次都变。前端怎么稳定地访问后端？</li>
+        <li><strong>坏了怎么办？</strong>凌晨三点进程崩了，谁发现？谁重启？谁在机器整个宕机时把服务搬走？</li>
+        <li><strong>流量变了怎么办？</strong>大促流量翻十倍谁加副本？半夜低谷谁缩回来省钱？</li>
+      </ol>
+      <p>你可以自己写脚本解决其中一两个。但所有公司最终都会写出同一套东西——Google 把它十几年的内部经验（Borg 系统）开源成了 K8s。<strong>K8s 就是这四个问题的标准化答案。</strong></p>
+
+      <!-- ==================== 它干什么 ==================== -->
+      <h2 id="what-it-does">K8s 具体干什么：用你的话翻译</h2>
+      <p>K8s 的接口是声明式的（见<a href="00-mental-models.html">第 00 章</a>）。感受一下这个「翻译」过程：</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>你说（期望状态）</th><th>K8s 做（持续维持）</th></tr></thead>
+          <tbody>
+            <tr><td>「跑 3 份，一直活着」</td><td>Deployment / ReplicaSet 的控制循环盯着副本数，少了补、多了删</td></tr>
+            <tr><td>「流量均匀分给这 3 份」</td><td>Service 按标签选中它们，维护负载均衡规则</td></tr>
+            <tr><td>「后端之间能互相访问，但外部不行」</td><td>NetworkPolicy 按标签设防火墙</td></tr>
+            <tr><td>「给我 20G 磁盘，别因重启丢数据」</td><td>PVC 申请持久卷，跟着 Pod 挂载</td></tr>
+            <tr><td>「这个服务有 GPU 的机器才配跑」</td><td>节点标签 + 节点选择器 / 亲和性</td></tr>
+            <tr><td>「这台机器在维护，别往上面放」</td><td>污点（Taint）+ 容忍（Toleration）</td></tr>
+            <tr><td>「CPU 超过 70% 就加副本」</td><td>HPA 自动扩缩容</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>注意右列的动词都是<strong>持续性</strong>的：盯着、维护、跟着。这不是「执行一次命令」，而是「维持一个状态」——第 00 章的模型一。</p>
+
+      <!-- ==================== 和 Docker 的关系 ==================== -->
+      <h2 id="docker">和 Docker 是什么关系</h2>
+      <p>这是被问得最多、也答得最乱的一个问题。先看分层：</p>
+
+      <figure class="diagram" id="fig-stack">
+        <div class="diagram-canvas-wrap"></div>
+        <figcaption class="diagram-caption"><b>分层视图</b>：打包与运行是 Docker / OCI 生态的地盘；编排是 K8s 的地盘。两者是上下游，不是竞争者</figcaption>
+      </figure>
+
+      <ul>
+        <li><strong>镜像格式</strong>是 Docker 确立的 OCI 标准——K8s 直接沿用，你今天 <code>docker build</code> 出来的镜像，K8s 拿来就能跑</li>
+        <li><strong>容器运行时</strong>负责真正跑容器：containerd、CRI-O 等。K8s 通过 <strong>CRI</strong>（Container Runtime Interface）调用它们</li>
+        <li><strong>K8s</strong> 在更上一层：决定容器跑在哪、跑几份、坏了怎么办</li>
+      </ul>
+
+      <h3 id="dockershim">「K8s 移除 Docker 支持」的真相</h3>
+      <p>早期 K8s 通过一个叫 <strong>DockerShim</strong> 的适配层直接调用 Docker  daemon。但 Docker 是个面向开发者的全家桶（CLI、compose、build、daemon……），K8s 只需要其中「跑容器」那一小块。</p>
+      <p>于是 K8s 定义了 CRI 标准接口，让运行时各凭本事接入。DockerShim 在 1.20 标记废弃、1.24 移除。<strong>被移除的是适配层，不是兼容性</strong>：Docker 造的镜像照跑，Docker 作为开发工具照用。媒体标题党了。</p>
+
+      <h3 id="vs-compose">那 Docker Compose 呢</h3>
+      <p>Compose 也是声明式（一个 YAML 描述多个容器），但它是<strong>单机</strong>的：没有跨机器调度，没有控制循环自愈（容器退出就是退出了），没有集群级服务发现。</p>
+      <p>一个粗糙但准确的类比：<strong>Compose 是单台机器上的容器清单，K8s 是一个机群的操作系统。</strong></p>
+
+      <!-- ==================== 该不该用 ==================== -->
+      <h2 id="when">什么场景该用，什么场景不该用</h2>
+      <p>这一节比功能介绍更值钱，因为大部分 K8s 的痛苦来自<strong>误用</strong>。</p>
+
+      <h3 id="when-yes">适合用</h3>
+      <ul>
+        <li>服务数量多（微服务），需要统一的部署、扩缩、观测方式</li>
+        <li>流量有波动，需要弹性伸缩</li>
+        <li>对可用性有要求，需要故障自愈、滚动升级不中断</li>
+        <li>多团队协作，需要资源隔离与配额管理</li>
+      </ul>
+
+      <h3 id="when-no">不适合用</h3>
+      <ul>
+        <li><strong>单机就能扛住</strong>：一个 monolith + 一个数据库。docker compose 或干脆 systemd 就够了</li>
+        <li><strong>团队没有运维能力</strong>：K8s 本身是一个需要被运维的复杂系统。没有专人，它会成为你最大的故障源</li>
+        <li><strong>批处理 / 大数据为主</strong>：有更对口的调度器（YARN、Spark 自带调度），K8s 上跑只是「可以」，不是「合适」</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">一句话判断</div>
+        <p>K8s 解决的是<strong>规模带来的问题</strong>。如果你的规模没到，引入 K8s 等于引入它自身的全部复杂度，却用不上它的任何好处。</p>
+      </div>
+
+      <hr class="sep">
+
+      <!-- ==================== 面试官视角 ==================== -->
+      <h2 id="interview">面试官视角</h2>
+
+      <p><strong>Q1：用一句话介绍 Kubernetes？</strong></p>
+      <div class="answer-compare">
+        <div class="answer bad">
+          <div class="answer-head">✕ 平庸答案 · 背定义</div>
+          <div class="answer-body"><p>「K8s 是一个开源的容器编排平台，支持自动化部署、扩展和管理容器化应用。」</p><p>——官方定义的复述，零信息量，面试官无法判断你是否理解。</p></div>
+        </div>
+        <div class="answer good">
+          <div class="answer-head">✓ 加分答案 · 从问题出发</div>
+          <div class="answer-body"><p>「K8s 本质上是在回答一个问题：当容器多到单机管不过来时，怎么在一群机器上统一管理它们。它给出四个答案——调度解决『放哪』，Service 解决『怎么找到』，控制循环解决『坏了怎么办』，自动扩缩解决『流量变了怎么办』。而贯穿这四个答案的设计是声明式 API：你描述期望状态，系统持续维持它。」</p></div>
+        </div>
+      </div>
+
+      <p><strong>Q2：K8s 和 Docker 的区别 / 关系？</strong></p>
+      <div class="answer-compare">
+        <div class="answer bad">
+          <div class="answer-head">✕ 平庸答案</div>
+          <div class="answer-body"><p>「Docker 是容器技术，K8s 是管理容器的。」</p><p>方向对，但经不起追问：那 K8s 移除 Docker 支持是怎么回事？</p></div>
+        </div>
+        <div class="answer good">
+          <div class="answer-head">✓ 加分答案 · 分层 + 历史</div>
+          <div class="answer-body"><p>「它们是不同层的东西。Docker 确立了镜像的 OCI 标准，也提供运行时；K8s 是编排层，通过 CRI 标准接口调用运行时，不绑定任何具体实现。所谓『K8s 移除 Docker 支持』移除的是 DockerShim 这个适配层——因为 K8s 只需要『跑容器』这一小块能力，而 Docker daemon 是个面向开发者的全家桶。镜像格式完全兼容，Docker build 的镜像 K8s 照跑。」</p></div>
+        </div>
+      </div>
+
+      <!-- ==================== 常见误区 ==================== -->
+      <h2 id="myths">常见误区</h2>
+
+      <div class="myth">
+        <div class="myth-q">误区一：K8s 是 Docker 的升级版 / 替代品</div>
+        <p class="myth-a">不同层。Docker 解决「打包和单机运行」，K8s 解决「机群管理」。你的开发机上依然装 Docker，集群里跑的是 containerd。</p>
+      </div>
+
+      <div class="myth">
+        <div class="myth-q">误区二：上 K8s = 云原生 = 技术先进</div>
+        <p class="myth-a">工具匹配规模才有价值。三个服务的团队上 K8s，通常结果是：应用没变好，运维复杂度翻十倍，还多了一个需要半夜爬起来修的系统。</p>
+      </div>
+
+      <div class="myth">
+        <div class="myth-q">误区三：K8s 会「运行」我的容器</div>
+        <p class="myth-a">K8s 控制平面不碰任何容器。真正跑容器的是每个节点上的容器运行时，kubelet 只是它的调用者。控制平面挂了的集群里，已运行的容器可以继续跑很久——这个事实后面还会反复出现。</p>
+      </div>
+
+      <div class="myth">
+        <div class="myth-q">误区四：K8s 只能跑容器</div>
+        <p class="myth-a">K8s 调度的基本单位是 Pod，容器是其中最主要的负载，但不是唯一。通过扩展（如 KubeVirt）它也能管理虚拟机。理解成「容器编排」是对的，但要知道边界比这宽一点。</p>
+      </div>
+
+      <!-- ==================== 延伸 ==================== -->
+      <h2 id="further">延伸</h2>
+      <ul>
+        <li><a href="https://kubernetes.io/docs/concepts/overview/" rel="noopener">官方文档 · What is Kubernetes?</a></li>
+        <li>Borg / Omega 论文：K8s 设计思想的源头（<a href="https://research.google/pubs/pub43438/" rel="noopener">Large-scale cluster management at Google with Borg</a>）</li>
+        <li>下一章看这些职责落在哪些组件上：<a href="02-architecture.html">02 · 架构总览</a></li>
+      </ul>
+
+      <div class="mark-done">
+        <button type="button" data-chapter="01">读完本章，打个卡</button>
+      </div>
+
+      <nav class="chapter-nav" id="chapterNav" aria-label="章节导航"></nav>
+
+    </article>
+
+    <aside class="page-toc" id="pageToc" aria-label="本页目录"></aside>
+  </main>
+</div>
+
+<script src="assets/site.js"></script>
+<script src="assets/diagram.js"></script>
+<script src="assets/main.js"></script>
+<script>
+/* 图 1：四个问题 */
+K8C.Diagram.mount('#fig-questions', {
+  width: 760, height: 360,
+  nodes: [
+    { id:'k8s', x:380, y:180, w:190, h:66, label:'Kubernetes', sub:'编排层', kind:'hub' },
+    { id:'q1', x:130, y:62,  w:210, h:56, label:'放哪？', sub:'几十容器 × 十几机器' },
+    { id:'q2', x:630, y:62,  w:210, h:56, label:'怎么互相找到？', sub:'IP 随时在变' },
+    { id:'q3', x:130, y:298, w:210, h:56, label:'坏了怎么办？', sub:'凌晨三点谁修' },
+    { id:'q4', x:630, y:298, w:210, h:56, label:'流量变了怎么办？', sub:'扩容 / 缩容' }
+  ],
+  edges: [
+    { from:'k8s', to:'q1', label:'调度器', color:'accent' },
+    { from:'k8s', to:'q2', label:'Service / DNS', color:'accent' },
+    { from:'k8s', to:'q3', label:'控制循环自愈', color:'accent' },
+    { from:'k8s', to:'q4', label:'自动扩缩容', color:'accent' }
+  ]
+});
+
+/* 图 2：分层栈 */
+K8C.Diagram.mount('#fig-stack', {
+  width: 660, height: 450,
+  groups: [
+    { x:110, y:26,  w:440, h:228, label:'打包与运行 · Docker / OCI 生态的地盘' },
+    { x:110, y:272, w:440, h:168, label:'编排 · K8s 的地盘' }
+  ],
+  nodes: [
+    { id:'l1', x:330, y:62,  w:380, h:50, label:'你的应用代码' },
+    { id:'l2', x:330, y:142, w:380, h:50, label:'OCI 镜像', sub:'docker build / buildkit' },
+    { id:'l3', x:330, y:222, w:380, h:50, label:'容器运行时', sub:'containerd / CRI-O · 经 CRI 调用' },
+    { id:'l4', x:330, y:306, w:380, h:50, label:'kubelet', sub:'每个节点上的代理人' },
+    { id:'l5', x:330, y:392, w:380, h:50, label:'K8s 控制平面', sub:'调度 / 自愈 / 扩缩', kind:'hub' }
+  ],
+  edges: [
+    { from:'l1', to:'l2', label:'打包为' },
+    { from:'l2', to:'l3', label:'由…运行' },
+    { from:'l3', to:'l4', label:'由…调用' },
+    { from:'l4', to:'l5', label:'汇报 / 受令' }
+  ]
+});
+</script>
+</body>
+</html>

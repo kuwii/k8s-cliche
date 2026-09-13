@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>404 · k8s-cliche</title>
+<script>
+(function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+</script>
+<style>
+  /* 404 可能在任意路径深度被访问，外链样式不可靠 —— 本页自包含 */
+  :root {
+    --bg:#fff; --surface:#fff; --border:#e3e8f0; --text:#1b2333;
+    --text-soft:#4c586c; --text-mute:#7c8798; --accent:#326ce5;
+    --accent-soft:rgba(50,108,229,.10); --accent-line:rgba(50,108,229,.28);
+    --font-body:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  html[data-theme="dark"] {
+    --bg:#0e131d; --surface:#161d2a; --border:#25303f; --text:#e4eaf4;
+    --text-soft:#b3bdcd; --text-mute:#8492a6; --accent:#6fa0ff;
+    --accent-soft:rgba(111,160,255,.13); --accent-line:rgba(111,160,255,.34);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; min-height:100vh; display:grid; place-items:center;
+    background:var(--bg); color:var(--text); font-family:var(--font-body); line-height:1.7;
+  }
+  .nf { max-width:560px; padding:0 24px; text-align:center; }
+  .nf h1 { font-size:88px; margin:0 0 4px; color:var(--accent); letter-spacing:-.04em; font-weight:800; }
+  .nf .sub { font-size:15px; color:var(--text-mute); margin:0 0 26px; }
+  .nf p { color:var(--text-soft); font-size:15.5px; margin:0 0 28px; }
+  .nf code { font-family:ui-monospace,Menlo,monospace; font-size:.88em; background:var(--accent-soft); border:1px solid var(--accent-line); padding:1px 6px; border-radius:5px; color:var(--accent); }
+  .nf a.btn {
+    display:inline-flex; align-items:center; gap:7px;
+    border:1px solid var(--accent-line); background:var(--accent-soft); color:var(--accent);
+    font-size:14px; font-weight:600; padding:9px 22px; border-radius:999px; text-decoration:none;
+  }
+  .nf a.btn:hover { background:var(--accent); color:#fff; }
+</style>
+</head>
+<body>
+<div class="nf">
+  <h1>404</h1>
+  <p class="sub">NotFound</p>
+  <p>这个资源不存在，或者对应的章节还在施工中。<br>
+  毕竟，控制器也调谐不回一个从未在 <code>spec</code> 里声明过的对象。</p>
+  <a class="btn" id="homeLink" href="/">← 返回首页</a>
+</div>
+<script>
+  /* GitHub Pages 项目站点的根路径是 /<repo>/，用户站点是 /。
+     若部署为项目站点，把下面一行改成 var base = '/k8s-cliche/'; */
+  (function () {
+    var base = '/';
+    document.getElementById('homeLink').href = base;
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>04 · 对象全景图 · k8s-cliche</title>
+<meta name="description" content="K8s 核心对象分类索引：工作负载、服务发现、配置存储、集群治理、安全六大类，以及对象之间的关系链。">
+<script>
+(function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+</script>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23326ce5' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23326ce5'/%3E%3C/svg%3E">
+</head>
+<body data-page="04">
+<a class="skip-link" href="#top">跳到正文</a>
+<div id="progress"></div>
+
+<header class="topbar">
+  <button class="icon-btn" id="navToggle" type="button" aria-label="打开目录">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+  </button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" style="color:var(--accent)">
+        <circle cx="32" cy="32" r="24" stroke-width="4"/>
+        <circle cx="32" cy="32" r="6" fill="currentColor" stroke="none"/>
+        <g stroke-width="4" stroke-linecap="round">
+          <line x1="32" y1="26" x2="32" y2="8"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(51.43 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(102.86 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(154.29 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(205.71 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(257.14 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(308.57 32 32)"/>
+        </g>
+      </svg>
+    </span>
+    k8s-cliche
+  </a>
+  <span class="topbar-chapter"></span>
+  <div class="topbar-spacer"></div>
+  <button class="icon-btn" id="themeToggle" type="button" title="切换深色 / 浅色主题" aria-label="切换主题">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4.5"/>
+      <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/>
+    </svg>
+  </button>
+</header>
+
+<div class="nav-scrim"></div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar" aria-label="章节目录">
+    <nav id="sidebarNav"></nav>
+  </aside>
+
+  <main class="main" id="top">
+    <article class="content">
+      <span class="chapter-eyebrow">专题 · 第 04 章</span>
+      <h1>对象全景图</h1>
+      <p class="lede">几十种对象不用背。分成六类，记住关系链，剩下的用到再查。</p>
+
+      <div class="tldr">
+        <div class="tldr-label">一句话答案</div>
+        <p>K8s 对象按职责分六类：<strong>工作负载、服务发现与负载均衡、配置与存储、集群治理、安全、元数据与扩展</strong>。</p>
+        <p>比对象清单更重要的是<strong>关系链</strong>：Deployment → ReplicaSet → Pod 是所有权链，Service → EndpointSlice → Pod 是选择链，PVC → PV 是绑定链。</p>
+      </div>
+
+      <h2 id="why">为什么先分类</h2>
+      <p><code>kubectl api-resources</code> 会列出几十种资源，全背是徒劳的。分类的价值在于：<strong>遇到新对象时知道去哪个抽屉找它</strong>，并且能猜出它大概和谁有关系。</p>
+
+      <h2 id="six-categories">六个抽屉</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>类别</th><th>对象</th><th>一句话职责</th></tr></thead>
+          <tbody>
+            <tr><td rowspan="6"><strong>工作负载</strong><br>「怎么跑」</td><td>Pod</td><td>最小调度单元，一共享网络/存储的容器组</td></tr>
+            <tr><td>Deployment</td><td>无状态应用：副本数 + 滚动更新</td></tr>
+            <tr><td>StatefulSet</td><td>有状态应用：稳定标识 + 稳定存储</td></tr>
+            <tr><td>DaemonSet</td><td>每节点（或匹配节点）恰好一份</td></tr>
+            <tr><td>Job / CronJob</td><td>跑完就结束 / 定时跑</td></tr>
+            <tr><td>ReplicaSet</td><td>维持副本数；Deployment 的实现细节，极少直接用</td></tr>
+            <tr><td rowspan="3"><strong>服务发现与负载均衡</strong><br>「怎么找到」</td><td>Service</td><td>一组 Pod 的稳定入口（虚拟 IP + DNS 名）</td></tr>
+            <tr><td>EndpointSlice</td><td>Service 的后端列表，控制器按标签自动维护</td></tr>
+            <tr><td>Ingress</td><td>七层路由规则：域名/路径 → Service</td></tr>
+            <tr><td rowspan="5"><strong>配置与存储</strong><br>「用什么跑」</td><td>ConfigMap / Secret</td><td>配置 / 敏感信息，与镜像解耦</td></tr>
+            <tr><td>PersistentVolumeClaim</td><td>用户对存储的「申请单」</td></tr>
+            <tr><td>PersistentVolume</td><td>存储资源本体</td></tr>
+            <tr><td>StorageClass</td><td>「如何动态创建存储」的配方</td></tr>
+            <tr><td>emptyDir</td><td>与 Pod 同生共死的临时目录（不是独立对象，是 volume 类型）</td></tr>
+            <tr><td rowspan="4"><strong>集群治理</strong><br>「怎么管」</td><td>Namespace</td><td>名字隔离 + 配额作用域</td></tr>
+            <tr><td>ResourceQuota / LimitRange</td><td>namespace 级总量配额 / 单对象默认值</td></tr>
+            <tr><td>HorizontalPodAutoscaler</td><td>按指标自动改副本数</td></tr>
+            <tr><td>PodDisruptionBudget</td><td>主动运维时保证的最小可用副本数</td></tr>
+            <tr><td rowspan="4"><strong>安全</strong><br>「谁能干什么」</td><td>ServiceAccount</td><td>Pod 的身份</td></tr>
+            <tr><td>Role / ClusterRole</td><td>一组权限规则（verb + resource）</td></tr>
+            <tr><td>RoleBinding / ClusterRoleBinding</td><td>把规则绑到主体上</td></tr>
+            <tr><td>NetworkPolicy</td><td>Pod 间流量的防火墙</td></tr>
+            <tr><td rowspan="3"><strong>元数据与扩展</strong><br>「怎么组织 / 怎么加长」</td><td>Label / Annotation</td><td>选择依据 / 附带信息</td></tr>
+            <tr><td>CustomResourceDefinition</td><td>注册新资源类型</td></tr>
+            <tr><td>Node</td><td>节点对象；集群里少数「代表物理现实」的对象</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="relations">三条关系链</h2>
+      <figure class="diagram" id="fig-objects">
+        <div class="diagram-canvas-wrap"></div>
+        <figcaption class="diagram-caption"><b>对象关系</b>：实线是所有权（删除会级联），Service 一系是选择关系，PVC→PV 是绑定关系</figcaption>
+      </figure>
+
+      <h3 id="owner-chain">所有权链：Deployment → ReplicaSet → Pod</h3>
+      <p>Deployment 不直接管 Pod。它管 ReplicaSet，ReplicaSet 管 Pod。中间这层的意义是<strong>滚动更新</strong>：新版本 = 新 ReplicaSet，旧的缩到 0 但保留，回滚就是切回去。</p>
+      <p>所有权由 <code>ownerReferences</code> 字段表达，它是<strong>级联删除</strong>的依据：删 Deployment，它的 ReplicaSet 和 Pod 会被垃圾回收一起删掉。第 00 章说「K8s 没有从属关系只有标签」——所有权是这句话的唯一例外补充：<em>选择靠标签，生死靠 ownerReferences</em>。</p>
+
+      <h3 id="select-chain">选择链：Service → EndpointSlice → Pod</h3>
+      <p>Service 只存选择器；EndpointSlice 控制器把匹配且 <strong>Ready</strong> 的 Pod 写成后端列表。注意 Ready 这个条件——readiness 探针失败的 Pod 不在列表里，这是「Service 不通」的高频真凶（第 03 章误区五）。</p>
+
+      <h3 id="bind-chain">绑定链：PVC → PV</h3>
+      <p>PVC 是申请单，PV 是资源本体，绑定后 Pod 通过 PVC 用存储。细节见<a href="07-storage.html">第 07 章</a>。</p>
+
+      <h2 id="confusions">三组最易混的对照</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>对照</th><th>分界线</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Deployment vs StatefulSet</strong></td><td>副本之间可否互换。可以（无状态）→ Deployment；不可以（每个副本有自己的身份和数据）→ StatefulSet</td></tr>
+            <tr><td><strong>Deployment vs DaemonSet</strong></td><td>副本数由谁定。你定（要几份）→ Deployment；拓扑定（每节点一份）→ DaemonSet</td></tr>
+            <tr><td><strong>Service vs Ingress</strong></td><td>四层 vs 七层。Service 是 IP:Port 级的稳定入口；Ingress 是域名/路径级的路由，且需要控制器实现</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="interview">面试官视角</h2>
+      <p><strong>Q：说说 K8s 常见对象和它们的关系？</strong></p>
+      <div class="answer-compare">
+        <div class="answer bad">
+          <div class="answer-head">✕ 平庸答案</div>
+          <div class="answer-body"><p>逐个念对象定义。</p><p>——没有结构，听完记不住，也看不出理解深度。</p></div>
+        </div>
+        <div class="answer good">
+          <div class="answer-head">✓ 加分答案 · 分类 + 关系链</div>
+          <div class="answer-body"><p>「我按职责分六类：工作负载、服务发现、配置存储、集群治理、安全、元数据与扩展。关系上最关键的是三条链：Deployment 通过 ReplicaSet 拥有 Pod，删除会级联；Service 通过选择器经 EndpointSlice 指向 Ready 的 Pod，这是选择关系不是所有权；PVC 绑定 PV 使用存储。理解『选择靠标签、生死靠 ownerReferences』这一句，大部分对象行为都能推出来。」</p></div>
+        </div>
+      </div>
+
+      <h2 id="myths">常见误区</h2>
+      <div class="myth">
+        <div class="myth-q">误区一：直接用 ReplicaSet 管理应用</div>
+        <p class="myth-a">几乎从不。ReplicaSet 没有滚动更新能力。Deployment 是它的正确包装。</p>
+      </div>
+      <div class="myth">
+        <div class="myth-q">误区二：Pod = 一个容器</div>
+        <p class="myth-a">Pod 是「共享网络和存储卷的容器组」。单容器 Pod 是常见特例，不是定义。sidecar 模式正建立在多容器 Pod 之上。</p>
+      </div>
+      <div class="myth">
+        <div class="myth-q">误区三：Namespace 是安全隔离边界</div>
+        <p class="myth-a">默认只是名字与配额的作用域。Pod 间网络默认全通，跨 namespace 也能访问。真隔离要 NetworkPolicy + RBAC +（必要时）其他手段。</p>
+      </div>
+
+      <h2 id="further">延伸</h2>
+      <ul>
+        <li><a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/" rel="noopener">官方文档 · Working with Objects</a></li>
+        <li>工作负载逐个展开：<a href="05-workloads.html">05 · 工作负载</a></li>
+      </ul>
+
+      <div class="mark-done">
+        <button type="button" data-chapter="04">读完本章，打个卡</button>
+      </div>
+
+      <nav class="chapter-nav" id="chapterNav" aria-label="章节导航"></nav>
+    </article>
+
+    <aside class="page-toc" id="pageToc" aria-label="本页目录"></aside>
+  </main>
+</div>
+
+<script src="assets/site.js"></script>
+<script src="assets/diagram.js"></script>
+<script src="assets/main.js"></script>
+<script>
+/* 04 章 · 对象关系图 */
+K8C.Diagram.mount('#fig-objects', {
+  width: 840, height: 340,
+  nodes: [
+    { id:'deploy', x:140, y:60,  w:150, h:48, label:'Deployment' },
+    { id:'rs',     x:140, y:160, w:140, h:44, label:'ReplicaSet' },
+    { id:'pod',    x:140, y:262, w:120, h:44, label:'Pod', color:'accent' },
+    { id:'svc',    x:430, y:60,  w:140, h:48, label:'Service' },
+    { id:'eps',    x:430, y:160, w:150, h:44, label:'EndpointSlice' },
+    { id:'sts',    x:430, y:262, w:150, h:48, label:'StatefulSet' },
+    { id:'pvc',    x:700, y:60,  w:140, h:48, label:'PVC' },
+    { id:'pv',     x:700, y:160, w:140, h:48, label:'PersistentVolume' }
+  ],
+  edges: [
+    { from:'deploy', to:'rs',  label:'拥有' },
+    { from:'rs',     to:'pod', label:'拥有' },
+    { from:'svc',    to:'eps', label:'维护' },
+    { from:'eps',    to:'pod', label:'后端列表', color:'ok' },
+    { from:'sts',    to:'pod', label:'拥有（稳定标识）' },
+    { from:'sts',    to:'pvc', label:'每 Pod 一份 PVC', labelDy:-20 },
+    { from:'pvc',    to:'pv',  label:'绑定' }
+  ]
+});
+
+</script>
+</body>
+</html>

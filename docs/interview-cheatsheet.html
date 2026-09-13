@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>附录 · 面试速查 · k8s-cliche</title>
+<meta name="description" content="K8s 高频面试问题清单、加分表述要点与陷阱题。">
+<script>
+(function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+</script>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23326ce5' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23326ce5'/%3E%3C/svg%3E">
+</head>
+<body data-page="cheatsheet">
+<a class="skip-link" href="#top">跳到正文</a>
+<div id="progress"></div>
+
+<header class="topbar">
+  <button class="icon-btn" id="navToggle" type="button" aria-label="打开目录">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+  </button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" style="color:var(--accent)">
+        <circle cx="32" cy="32" r="24" stroke-width="4"/>
+        <circle cx="32" cy="32" r="6" fill="currentColor" stroke="none"/>
+        <g stroke-width="4" stroke-linecap="round">
+          <line x1="32" y1="26" x2="32" y2="8"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(51.43 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(102.86 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(154.29 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(205.71 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(257.14 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(308.57 32 32)"/>
+        </g>
+      </svg>
+    </span>
+    k8s-cliche
+  </a>
+  <span class="topbar-chapter"></span>
+  <div class="topbar-spacer"></div>
+  <button class="icon-btn" id="themeToggle" type="button" title="切换深色 / 浅色主题" aria-label="切换主题">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4.5"/>
+      <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/>
+    </svg>
+  </button>
+</header>
+
+<div class="nav-scrim"></div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar" aria-label="章节目录">
+    <nav id="sidebarNav"></nav>
+  </aside>
+
+  <main class="main" id="top">
+    <article class="content">
+      <span class="chapter-eyebrow">附录</span>
+      <h1>面试速查</h1>
+      <p class="lede">高频问题 + 答题要点 + 陷阱题。用于考前过一遍，不用于从零学习。</p>
+
+      <div class="tldr">
+        <div class="tldr-label">使用方式</div>
+        <p>每题给的是<strong>加分要点</strong>，不是完整话术。能用自己的话把要点串成因果链，才算会；背要点本身，面试时会露出拼接痕迹。</p>
+      </div>
+
+      <h2 id="concepts">概念与架构</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>问题</th><th>加分要点</th></tr></thead>
+          <tbody>
+            <tr><td>K8s 是什么 / 解决什么问题</td><td>四个问题：放哪（调度）、怎么找到（Service）、坏了怎么办（控制循环）、流量变化（扩缩）；贯穿设计是声明式</td></tr>
+            <tr><td>和 Docker 的关系</td><td>分层：OCI 镜像标准 / 运行时（CRI）/ 编排；DockerShim 移除的是适配层不是兼容性</td></tr>
+            <tr><td>架构与组件职责</td><td>决策层 vs 执行层；只有 apiserver 写 etcd；组件靠 watch 协作不直接通信</td></tr>
+            <tr><td>某组件挂了会怎样</td><td>控制平面故障影响「未来变更」，数据路径与已运行负载短期不受影响；etcd 是唯一真单点风险</td></tr>
+            <tr><td>kube-proxy 怎么转发</td><td>不转发：维护 iptables/IPVS 规则，数据路径在内核；所以它挂了存量连接大多照常</td></tr>
+            <tr><td>为什么只有 apiserver 能碰 etcd</td><td>单一写入口才有统一的认证、审计、watch 通知；etcd 不承载业务语义</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="pod-life">Pod 生命周期</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>问题</th><th>加分要点</th></tr></thead>
+          <tbody>
+            <tr><td>apply 到 Ready 的完整流程</td><td>九站链（第 03 章）；准入 mutating 先于 validating；scheduler 只 bind；CNI 在沙箱创建时配 IP；EndpointSlice 收尾</td></tr>
+            <tr><td>三种探针区别</td><td>liveness 管生死（失败重启）、readiness 管流量（失败摘除）、startup 管慢启动；readiness 失败不重启</td></tr>
+            <tr><td>优雅终止过程</td><td>从 EndpointSlice 摘除 → SIGTERM → preStop → 宽限期（默认 30s）→ SIGKILL；摘除与杀进程是并行的，所以可能有短暂流量损失</td></tr>
+            <tr><td>容器崩溃重启走调度吗</td><td>不走：kubelet/运行时按 restartPolicy 本地重启；Pod 对象重建才重走全流程</td></tr>
+            <tr><td>CrashLoopBackOff 怎么排查</td><td>退出码定性（137=OOM）→ logs -p → lastState.terminated → 必要时 kubectl debug</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="workload-net">工作负载与网络</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>问题</th><th>加分要点</th></tr></thead>
+          <tbody>
+            <tr><td>Deployment 滚动更新</td><td>新 ReplicaSet + 交替伸缩；maxSurge/maxUnavailable 计算；旧 RS 保留所以回滚快</td></tr>
+            <tr><td>StatefulSet 三个稳定</td><td>网络标识、存储（volumeClaimTemplates）、有序部署；数据复制仍是应用职责</td></tr>
+            <tr><td>Service 四种类型</td><td>叠加关系：ClusterIP → NodePort → LoadBalancer；ExternalName 是 CNAME；headless 直接返回 Pod IP</td></tr>
+            <tr><td>ClusterIP 本质</td><td>虚拟 IP，只存在于内核规则；无网卡持有</td></tr>
+            <tr><td>DNS 解析链路</td><td>svc.ns.svc.cluster.local；普通 Service 解析到 ClusterIP，headless 到 Pod IP；ndots 导致的解析顺序坑</td></tr>
+            <tr><td>Ingress 与 Service 区别</td><td>七层 vs 四层；Ingress 对象是规则、控制器是执行者；控制器常经 LoadBalancer Service 暴露</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="res-sec">资源、存储、安全</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>问题</th><th>加分要点</th></tr></thead>
+          <tbody>
+            <tr><td>requests / limits 区别</td><td>调度账面 vs 上限；CPU 超限节流、内存超限 OOM；QoS 三档决定驱逐顺序</td></tr>
+            <tr><td>Eviction 与 OOM Kill 区别</td><td>节点级压力取舍 vs 单容器超自身 limit</td></tr>
+            <tr><td>污点与容忍</td><td>节点拒客视角；三种 effect；节点故障靠 NoExecute 污点驱赶 Pod</td></tr>
+            <tr><td>PV/PVC/StorageClass</td><td>供需两侧 + 创建配方；Delete 回收策略 = 删 PVC 即删数据</td></tr>
+            <tr><td>ConfigMap 热更新</td><td>volume 会更新（有延迟）、env 不更新、subPath 不更新；应用还要自己 reload</td></tr>
+            <tr><td>Secret 安全吗</td><td>base64 非加密；真安全 = RBAC + etcd 静态加密 + 传输 TLS</td></tr>
+            <tr><td>RBAC 四件套</td><td>Role/ClusterRole 是规则集，Binding 连主体；kubectl auth can-i 验证</td></tr>
+            <tr><td>给 Pod 最小权限</td><td>专属 SA → 零权限起步 → 按需 Role → RoleBinding（非 Cluster）；不需要就关 automount</td></tr>
+            <tr><td>Namespace 是安全边界吗</td><td>不是：网络默认全通；隔离要 NetworkPolicy + RBAC + PSA</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="ext">扩展与运维</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>问题</th><th>加分要点</th></tr></thead>
+          <tbody>
+            <tr><td>什么是 Operator</td><td>CRD + 控制器；把运维知识编码成调谐循环；与内置控制器同机制</td></tr>
+            <tr><td>Informer 原理</td><td>List-Watch + 本地缓存；读缓存写 API；WorkQueue 去重限速；watch 是推送不是轮询</td></tr>
+            <tr><td>准入 Webhook</td><td>mutating 可改写、validating 只裁决；顺序上 mutating 在前</td></tr>
+            <tr><td>HPA 原理</td><td>metrics-server 供指标；desired = ceil(current × desiredMetric/currentMetric)；受同步周期与稳定窗口影响</td></tr>
+            <tr><td>节点 NotReady 排查</td><td>describe node 压力条件 → kubelet 日志 → 磁盘/网络插件；宽限期后 Pod 被重建</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="traps">陷阱题清单（答错即减分）</h2>
+      <ul>
+        <li>「kube-proxy 把流量代理到 Pod」→ 它不在数据路径上</li>
+        <li>「apply 成功就是部署成功」→ 只完成了落库，后面全异步</li>
+        <li>「Service 里存着 Pod 列表」→ 存的是选择器；列表在 EndpointSlice</li>
+        <li>「readiness 失败会重启容器」→ 只会摘流量；重启是 liveness 的事</li>
+        <li>「Secret 是加密的」→ base64 编码</li>
+        <li>「Namespace 默认隔离」→ 默认全通</li>
+        <li>「scheduler 启动容器」→ 只写 nodeName</li>
+        <li>「K8s 移除 Docker 支持 = 不兼容 Docker」→ 移除的是 DockerShim，镜像照跑</li>
+        <li>「StatefulSet 自动数据高可用」→ 只保证盘跟着 Pod 走</li>
+        <li>「写了 CRD 就有功能」→ 没有控制器什么都不会发生</li>
+      </ul>
+
+      <div class="mark-done">
+        <button type="button" data-chapter="interview-cheatsheet.html">读完本章，打个卡</button>
+      </div>
+
+      <nav class="chapter-nav" id="chapterNav" aria-label="章节导航"></nav>
+    </article>
+
+    <aside class="page-toc" id="pageToc" aria-label="本页目录"></aside>
+  </main>
+</div>
+
+<script src="assets/site.js"></script>
+<script src="assets/diagram.js"></script>
+<script src="assets/main.js"></script>
+</body>
+</html>

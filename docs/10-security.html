@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>10 · 安全 · k8s-cliche</title>
+<meta name="description" content="认证、RBAC、ServiceAccount、Pod 安全准入、SecurityContext 与 NetworkPolicy。">
+<script>
+(function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+</script>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23326ce5' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23326ce5'/%3E%3C/svg%3E">
+</head>
+<body data-page="10">
+<a class="skip-link" href="#top">跳到正文</a>
+<div id="progress"></div>
+
+<header class="topbar">
+  <button class="icon-btn" id="navToggle" type="button" aria-label="打开目录">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+  </button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" style="color:var(--accent)">
+        <circle cx="32" cy="32" r="24" stroke-width="4"/>
+        <circle cx="32" cy="32" r="6" fill="currentColor" stroke="none"/>
+        <g stroke-width="4" stroke-linecap="round">
+          <line x1="32" y1="26" x2="32" y2="8"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(51.43 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(102.86 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(154.29 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(205.71 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(257.14 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(308.57 32 32)"/>
+        </g>
+      </svg>
+    </span>
+    k8s-cliche
+  </a>
+  <span class="topbar-chapter"></span>
+  <div class="topbar-spacer"></div>
+  <button class="icon-btn" id="themeToggle" type="button" title="切换深色 / 浅色主题" aria-label="切换主题">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4.5"/>
+      <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/>
+    </svg>
+  </button>
+</header>
+
+<div class="nav-scrim"></div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar" aria-label="章节目录">
+    <nav id="sidebarNav"></nav>
+  </aside>
+
+  <main class="main" id="top">
+    <article class="content">
+      <span class="chapter-eyebrow">专题 · 第 10 章</span>
+      <h1>安全</h1>
+      <p class="lede">四层防线：你是谁、你能干什么、你的 Pod 能干什么、谁能和谁说话。</p>
+
+      <div class="tldr">
+        <div class="tldr-label">一句话答案</div>
+        <p>K8s 安全是四层：<strong>认证</strong>（证书 / Token / ServiceAccount）→ <strong>RBAC</strong>（谁能对什么资源做什么动作）→ <strong>Pod 安全</strong>（SecurityContext + Pod Security Admission）→ <strong>NetworkPolicy</strong>（Pod 间流量防火墙）。</p>
+        <p>最小权限原则贯穿四层：默认什么都别给，按需开。</p>
+      </div>
+
+      <h2 id="authn">第一层：认证（你是谁）</h2>
+      <ul>
+        <li><strong>客户端证书</strong>：kubeconfig 里那对 crt/key，人或组件的长期身份</li>
+        <li><strong>ServiceAccount Token</strong>：Pod 的身份。现代方式是<strong>绑定投影卷</strong>（Bound Service Account Token）：带过期时间、按受众签发，比旧的全权限长期 token 安全得多</li>
+        <li><strong>OIDC</strong>：对接企业 IdP（如 Dex、云厂商 IAM），kubectl 登录走浏览器</li>
+      </ul>
+      <p>认证只回答「你是谁」，不回答「你能干什么」——后者是下一层。</p>
+
+      <h2 id="rbac">第二层：RBAC（你能干什么）</h2>
+      <figure class="diagram" id="fig-rbac">
+        <div class="diagram-canvas-wrap"></div>
+        <figcaption class="diagram-caption"><b>RBAC 四件套</b>：Binding 把「主体」和「规则集」连起来；Role 是 namespace 级，ClusterRole 是集群级</figcaption>
+      </figure>
+      <ul>
+        <li><strong>Role / ClusterRole</strong>：规则集合，每条规则 = 资源（pods、deployments…）+ 动词（get/list/watch/create/update/patch/delete）</li>
+        <li><strong>RoleBinding / ClusterRoleBinding</strong>：把规则集绑到主体（User / Group / ServiceAccount）</li>
+        <li>Role 作用于单个 namespace；ClusterRole 可集群级使用，也可通过 RoleBinding 「降级」用在某个 namespace</li>
+      </ul>
+      <div class="code-block" data-lang="yaml" data-file="role.yaml">
+<pre><code>apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: prod
+  name: pod-reader
+rules:
+  - apiGroups: [""]          # 核心组
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]   # 只读，不能删</code></pre>
+      </div>
+      <p>排错利器：<code>kubectl auth can-i delete pods --as=system:serviceaccount:prod:my-sa</code> —— 直接问「这个身份能不能做这件事」。</p>
+
+      <h2 id="pod-security">第三层：Pod 自身的安全姿态</h2>
+      <h3 id="psa">Pod Security Admission（PSA）</h3>
+      <p>namespace 级三档策略，取代已废弃的 PSP：</p>
+      <ul>
+        <li><code>privileged</code>：不限制（系统组件 namespace 用）</li>
+        <li><code>baseline</code>：禁止明显的特权化（hostNetwork、privileged 容器等）</li>
+        <li><code>restricted</code>：最严，强制非 root、丢弃 capabilities 等</li>
+      </ul>
+      <p>用 namespace 标签声明：<code>pod-security.kubernetes.io/enforce: restricted</code>。</p>
+      <h3 id="securitycontext">SecurityContext：单 Pod 的精细控制</h3>
+      <div class="code-block" data-lang="yaml">
+<pre><code>securityContext:
+  runAsNonRoot: true            # 禁止 root 运行
+  readOnlyRootFilesystem: true  # 根文件系统只读，写临时文件走 emptyDir
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]               # 丢弃全部 Linux capabilities，按需加回</code></pre>
+      </div>
+      <p>这四行是「容器逃逸」防线的主力：攻击者即便进了容器，没有 root、没有 capabilities、写不了文件系统，能做的事极其有限。</p>
+
+      <h2 id="netpol">第四层：NetworkPolicy</h2>
+      <p>Pod 间默认全通。NetworkPolicy 按标签收口：只允许来自前端 namespace 的 80 端口访问后端，其余拒绝。机制与注意点见<a href="06-networking.html">第 06 章</a>。</p>
+
+      <h2 id="defense">串起来：一个最小权限的例子</h2>
+      <p>给「订单服务」做安全加固的完整动作：</p>
+      <ol>
+        <li>建专属 ServiceAccount，不用 default</li>
+        <li>RBAC 只给它需要的动词（比如只读某个 ConfigMap）；不需要 API 权限就一个 Binding 都不建</li>
+        <li>namespace 打 PSA <code>restricted</code> 标签</li>
+        <li>Pod 里写上面那四行 SecurityContext</li>
+        <li>NetworkPolicy：只放行网关到它的 8080，和它到数据库的 5432</li>
+      </ol>
+      <p>五步做完，「容器被攻破」到「集群沦陷」之间的路基本被切断。</p>
+
+      <h2 id="interview">面试官视角</h2>
+      <p><strong>Q：如何给一个 Pod 最小权限地访问 API？</strong></p>
+      <div class="answer-compare">
+        <div class="answer bad">
+          <div class="answer-head">✕ 平庸答案</div>
+          <div class="answer-body"><p>「给它一个 ServiceAccount，绑个 cluster-admin 方便调试。」</p><p>——反面教材。cluster-admin 绑定是集群里最常见的安全债。</p></div>
+        </div>
+        <div class="answer good">
+          <div class="answer-head">✓ 加分答案</div>
+          <div class="answer-body"><p>「先建专属 ServiceAccount 并在 Pod 里显式引用；然后从『零权限』出发，按需要加 Role：只给必要 namespace 的必要资源的必要动词，用 RoleBinding 绑定，不用 ClusterRoleBinding 除非确需集群级；用 <code>kubectl auth can-i</code> 验证。若应用根本不需要访问 API，就保持零权限并关掉 token 自动挂载（automountServiceAccountToken: false）。」</p></div>
+        </div>
+      </div>
+
+      <h2 id="myths">常见误区</h2>
+      <div class="myth">
+        <div class="myth-q">误区一：Namespace 之间默认隔离</div>
+        <p class="myth-a">名字与配额隔离而已。网络默认全通、RBAC 默认按 ClusterRole 可跨 namespace 授权。隔离要显式建。</p>
+      </div>
+      <div class="myth">
+        <div class="myth-q">误区二：RBAC 配好 = Pod 安全</div>
+        <p class="myth-a">RBAC 管的是「对 API 能做什么」。容器内的进程是否 root、能否逃逸，是 SecurityContext / PSA 的事。两层独立。</p>
+      </div>
+      <div class="myth">
+        <div class="myth-q">误区三：Secret 存了就安全</div>
+        <p class="myth-a">base64 不是加密（第 08 章）。能 list secret 的人等于拿到明文。Secret 的安全 = RBAC + etcd 静态加密 + 传输 TLS 三者之和。</p>
+      </div>
+
+      <h2 id="further">延伸</h2>
+      <ul>
+        <li><a href="https://kubernetes.io/docs/concepts/security/" rel="noopener">官方文档 · Security</a></li>
+        <li><a href="https://kubernetes.io/docs/concepts/policy/pod-security-admission/" rel="noopener">官方文档 · Pod Security Admission</a></li>
+      </ul>
+
+      <div class="mark-done">
+        <button type="button" data-chapter="10">读完本章，打个卡</button>
+      </div>
+
+      <nav class="chapter-nav" id="chapterNav" aria-label="章节导航"></nav>
+    </article>
+
+    <aside class="page-toc" id="pageToc" aria-label="本页目录"></aside>
+  </main>
+</div>
+
+<script src="assets/site.js"></script>
+<script src="assets/diagram.js"></script>
+<script src="assets/main.js"></script>
+<script>
+/* 10 章 · RBAC 四件套 */
+K8C.Diagram.mount('#fig-rbac', {
+  width: 900, height: 260,
+  nodes: [
+    { id:'sa',   x:110, y:80,  w:150, h:48, label:'ServiceAccount', sub:'Pod 的身份' },
+    { id:'user', x:110, y:180, w:150, h:48, label:'User / Group', sub:'人的身份' },
+    { id:'rb',   x:360, y:130, w:150, h:52, label:'RoleBinding', sub:'或 ClusterRoleBinding', color:'accent' },
+    { id:'role', x:600, y:130, w:160, h:52, label:'Role / ClusterRole', sub:'verb + resource 规则集', color:'accent' },
+    { id:'res',  x:810, y:130, w:130, h:52, label:'资源', sub:'pods / secrets…' }
+  ],
+  edges: [
+    { from:'sa',   to:'rb',   label:'subjects' },
+    { from:'user', to:'rb',   label:'subjects' },
+    { from:'rb',   to:'role', label:'roleRef' },
+    { from:'role', to:'res',  label:'rules 允许', labelDx:-14 }
+  ]
+});
+
+</script>
+</body>
+</html>

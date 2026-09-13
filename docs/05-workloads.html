@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>05 · 工作负载 · k8s-cliche</title>
+<meta name="description" content="Deployment / StatefulSet / DaemonSet / Job / CronJob 的适用场景、滚动更新机制与选型表。">
+<script>
+(function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+</script>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23326ce5' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23326ce5'/%3E%3C/svg%3E">
+</head>
+<body data-page="05">
+<a class="skip-link" href="#top">跳到正文</a>
+<div id="progress"></div>
+
+<header class="topbar">
+  <button class="icon-btn" id="navToggle" type="button" aria-label="打开目录">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+  </button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" style="color:var(--accent)">
+        <circle cx="32" cy="32" r="24" stroke-width="4"/>
+        <circle cx="32" cy="32" r="6" fill="currentColor" stroke="none"/>
+        <g stroke-width="4" stroke-linecap="round">
+          <line x1="32" y1="26" x2="32" y2="8"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(51.43 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(102.86 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(154.29 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(205.71 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(257.14 32 32)"/>
+          <line x1="32" y1="26" x2="32" y2="8" transform="rotate(308.57 32 32)"/>
+        </g>
+      </svg>
+    </span>
+    k8s-cliche
+  </a>
+  <span class="topbar-chapter"></span>
+  <div class="topbar-spacer"></div>
+  <button class="icon-btn" id="themeToggle" type="button" title="切换深色 / 浅色主题" aria-label="切换主题">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4.5"/>
+      <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/>
+    </svg>
+  </button>
+</header>
+
+<div class="nav-scrim"></div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar" aria-label="章节目录">
+    <nav id="sidebarNav"></nav>
+  </aside>
+
+  <main class="main" id="top">
+    <article class="content">
+      <span class="chapter-eyebrow">专题 · 第 05 章</span>
+      <h1>工作负载</h1>
+      <p class="lede">工作负载（Workload）回答一个问题：你的容器该「怎么跑」。</p>
+
+      <div class="tldr">
+        <div class="tldr-label">一句话答案</div>
+        <p>四种答案对应四种对象：<strong>无状态 → Deployment，有状态 → StatefulSet，每节点一份 → DaemonSet，跑完就结束 → Job / CronJob</strong>。</p>
+        <p>选型是一道四选一：副本之间可否互换？副本数由谁定？要不要跑完就停？</p>
+      </div>
+
+      <h2 id="pod-first">先回到 Pod：为什么它是最小单位</h2>
+      <p>Pod 不是「一个容器」，而是<strong>一个共享网络命名空间和存储卷的容器组</strong>（第 04 章）。同 Pod 内容器共享一个 IP、互用 <code>localhost</code> 通信、共享挂载卷——它们是「同生共死的一组进程」。</p>
+      <p>这个设计支撑了 sidecar 模式：日志收集器、服务网格代理、配置刷新器，都作为「配角容器」和主容器住在同一个 Pod 里。</p>
+      <div class="callout note">
+        <div class="callout-title">实践准则</div>
+        <p>几乎不要裸建 Pod。裸 Pod 死了就死了，没人补。永远让某个工作负载对象（哪怕只是 Deployment）持有它——这样控制循环才接得住。</p>
+      </div>
+
+      <h2 id="deployment">Deployment：无状态的标准答案</h2>
+      <p>你声明副本数和 Pod 模板，它保证：副本数维持、滚动更新、可回滚。</p>
+
+      <h3 id="rolling">滚动更新是怎么滚的</h3>
+      <p>改 Pod 模板（比如镜像版本）时，Deployment 创建<strong>一个新的 ReplicaSet</strong>，然后交替伸缩：新 RS 加一点、旧 RS 减一点，直到全部切换。节奏由两个参数控制：</p>
+      <div class="code-block" data-lang="yaml">
+<pre><code>strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 25%        # 更新期间最多可以「超出」期望副本数的数量
+    maxUnavailable: 25%  # 更新期间最多可以「不可用」的数量</code></pre>
+      </div>
+      <p>期望 4 副本、两个 25% 都向上取整为 1：更新时最多同时存在 5 个 Pod，最多 1 个不可用。<strong>这两个数决定了更新速度与可用性的权衡</strong>，面试爱考计算。</p>
+      <p>回滚之所以快，是因为旧 ReplicaSet 只是被缩到 0、对象还在：<code>kubectl rollout undo</code> 把流量权重切回去即可。</p>
+
+      <h2 id="statefulset">StatefulSet：给「有身份」的应用</h2>
+      <p>数据库、消息队列这类应用，副本之间<strong>不可互换</strong>：主从角色不同、各自数据不同。StatefulSet 提供三个稳定保证：</p>
+      <ul>
+        <li><strong>稳定网络标识</strong>：Pod 名是 <code>web-0</code>、<code>web-1</code>、<code>web-2</code>，重建后名字不变；配合 headless Service，每个 Pod 有独立 DNS 名</li>
+        <li><strong>稳定存储</strong>：<code>volumeClaimTemplates</code> 给每个 Pod 自动创建专属 PVC，Pod 重建后挂回<strong>自己原来那块盘</strong></li>
+        <li><strong>有序部署与伸缩</strong>：按序号逐个启动 / 逆序逐个删除</li>
+      </ul>
+      <div class="callout warn">
+        <div class="callout-title">StatefulSet 不替你管数据</div>
+        <p>它保证的是「盘跟着 Pod 走」，<strong>不保证数据复制</strong>。主从同步、分片、quorum 仍是应用自己的事。把 StatefulSet 当成「自动数据高可用」是危险误解。</p>
+      </div>
+
+      <h2 id="daemonset">DaemonSet：拓扑决定副本数</h2>
+      <p>每个节点（或满足节点选择条件的节点）恰好跑一个 Pod。典型：日志采集（node-exporter、fluentd）、监控 agent、kube-proxy 本身。</p>
+      <p>特征：<strong>没有 replicas 字段</strong>——副本数由节点拓扑决定，加节点自动加 Pod。</p>
+
+      <h2 id="job">Job / CronJob：跑完就结束</h2>
+      <p>前面三种都假设进程「应该一直活着」，进程退出就是异常。Job 反过来：<strong>退出才是成功</strong>。</p>
+      <ul>
+        <li><code>completions</code>：总共要成功几次；<code>parallelism</code>：同时跑几个</li>
+        <li><code>backoffLimit</code>：失败重试上限，超过则 Job 判失败</li>
+        <li>CronJob = Job + schedule（cron 表达式）+ <code>concurrencyPolicy</code>（Allow / Forbid / Replace，控制上一次没跑完时怎么办）</li>
+      </ul>
+
+      <h2 id="choose">选型表</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>你的需求</th><th>选择</th></tr></thead>
+          <tbody>
+            <tr><td>Web 服务、API、无状态微服务</td><td>Deployment</td></tr>
+            <tr><td>MySQL 主从、ZooKeeper、Kafka、Redis 集群</td><td>StatefulSet</td></tr>
+            <tr><td>每节点都要有的 agent（日志/监控/网络插件）</td><td>DaemonSet</td></tr>
+            <tr><td>数据批处理、迁移任务、一次性计算</td><td>Job</td></tr>
+            <tr><td>每天凌晨跑报表</td><td>CronJob</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="interview">面试官视角</h2>
+      <p><strong>Q：Deployment 的滚动更新过程？</strong></p>
+      <div class="answer-compare">
+        <div class="answer bad">
+          <div class="answer-head">✕ 平庸答案</div>
+          <div class="answer-body"><p>「逐个替换旧 Pod 为新 Pod。」</p><p>——漏了机制：新 ReplicaSet、交替伸缩、maxSurge/maxUnavailable、可回滚的原因。</p></div>
+        </div>
+        <div class="answer good">
+          <div class="answer-head">✓ 加分答案</div>
+          <div class="answer-body"><p>「改模板会触发新建一个 ReplicaSet，控制器按 maxSurge 和 maxUnavailable 交替伸缩新旧两个 RS：先起新、就绪后再缩旧，保证过程中可用副本不低于下限。旧 RS 缩到 0 但对象保留，所以 rollout undo 回滚几乎是瞬时切换。 readiness 探针在这里是关键——新 Pod 不通 readiness 就不会被计入可用，更新会卡住而不是带病上线。」</p></div>
+        </div>
+      </div>
+      <p><strong>Q：StatefulSet 和 Deployment 的区别？</strong>——答「三个稳定」：稳定网络标识、稳定存储（volumeClaimTemplates）、有序部署伸缩；并补一句「数据复制仍是应用自己的责任」，立刻区分于背答案的人。</p>
+
+      <h2 id="myths">常见误区</h2>
+      <div class="myth">
+        <div class="myth-q">误区一：StatefulSet 会自动做数据高可用</div>
+        <p class="myth-a">它只保证 PVC 跟着 Pod 走。主从同步、故障切换是应用层职责。</p>
+      </div>
+      <div class="myth">
+        <div class="myth-q">误区二：给 DaemonSet 设 replicas</div>
+        <p class="myth-a">没有这个字段。副本数 = 匹配污点/选择器的节点数。</p>
+      </div>
+      <div class="myth">
+        <div class="myth-q">误区三：Job 的 Pod 跑完会被立刻删掉</div>
+        <p class="myth-a">默认保留（Completed 状态），供查日志与审计。要清理靠 <code>ttlSecondsAfterFinished</code> 或手动。</p>
+      </div>
+
+      <h2 id="further">延伸</h2>
+      <ul>
+        <li><a href="https://kubernetes.io/docs/concepts/workloads/controllers/" rel="noopener">官方文档 · Workloads</a></li>
+        <li>Pod 内部机制（探针、生命周期）：<a href="03-birth-of-a-pod.html">03 · 一个 Pod 的诞生</a></li>
+      </ul>
+
+      <div class="mark-done">
+        <button type="button" data-chapter="05">读完本章，打个卡</button>
+      </div>
+
+      <nav class="chapter-nav" id="chapterNav" aria-label="章节导航"></nav>
+    </article>
+
+    <aside class="page-toc" id="pageToc" aria-label="本页目录"></aside>
+  </main>
+</div>
+
+<script src="assets/site.js"></script>
+<script src="assets/diagram.js"></script>
+<script src="assets/main.js"></script>
+</body>
+</html>
