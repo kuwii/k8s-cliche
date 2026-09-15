@@ -12,7 +12,7 @@ K8C.groups = [
 
 K8C.chapters = [
   /* ---- 主线 ---- */
-  { group:'main', num:'00', file:'00-mental-models.html', title:'心智模型',
+  { group:'main', num:'00', file:'00-how-it-works.html', title:'工作原理',
     desc:'四条贯穿 K8s 的核心思想。理解了它们，80% 的 K8s 对象可以自己推导出来',
     mins:18, ready:true },
   { group:'main', num:'01', file:'01-what-is-k8s.html', title:'K8s 是什么',

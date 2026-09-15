@@ -613,7 +613,7 @@ html[data-theme="dark"] .tok-flag { color: #f0a06a; }
 .myth-a { font-size: 14.6px; color: var(--text-soft); margin: 0; display: flex; gap: 7px; }
 .myth-a::before { content: "✓"; color: var(--ok); font-weight: 800; flex: none; }
 
-/* ---------- 16. 心智模型卡片 ---------- */
+/* ---------- 16. 模型卡片 ---------- */
 .model-card {
   margin: 0 0 18px;
   padding: 18px 20px;
