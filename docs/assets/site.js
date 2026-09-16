@@ -55,3 +55,42 @@ K8C.chapters = [
 K8C.chapterById = function (num) {
   return K8C.chapters.find(function (c) { return c.num === num; }) || null;
 };
+
+/* ============================================================
+   术语注册表 · B 级「首次出现链接」
+   只收「在某一章有详解、别处先会遇到」的名词。
+   有「名词提示」框的 A 级名词（Pod / Service / Deployment /
+   ReplicaSet / kubectl / API Server / etcd）不进此表——框已带链接。
+   main.js 在每页为每个术语的首次出现挂一个链接，指向详解章。
+   ============================================================ */
+K8C.terms = [
+  { name:'控制循环', target:'01' },
+  { name:'kubelet', target:'02' },
+  { name:'调度器', target:'02' },
+  { name:'节点', target:'02' },
+  { name:'集群', target:'02' },
+  { name:'探针', target:'03' },
+  { name:'命名空间', target:'04' },
+  { name:'StatefulSet', target:'05' },
+  { name:'DaemonSet', target:'05' },
+  { name:'CronJob', target:'05' },
+  { name:'Job', target:'05' },
+  { name:'NetworkPolicy', target:'06' },
+  { name:'Ingress', target:'06' },
+  { name:'CoreDNS', target:'06' },
+  { name:'EndpointSlice', target:'06' },
+  { name:'StorageClass', target:'07' },
+  { name:'PVC', target:'07' },
+  { name:'PV', target:'07' },
+  { name:'ConfigMap', target:'08' },
+  { name:'Secret', target:'08' },
+  { name:'ServiceAccount', target:'10' },
+  { name:'RBAC', target:'10' },
+  { name:'污点', target:'09' },
+  { name:'容忍', target:'09' },
+  { name:'亲和性', target:'09' },
+  { name:'QoS', target:'09' },
+  { name:'驱逐', target:'09' },
+  { name:'CRD', target:'11' },
+  { name:'Operator', target:'11' }
+];

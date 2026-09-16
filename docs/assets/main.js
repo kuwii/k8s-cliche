@@ -325,6 +325,68 @@
     el.textContent = doneCount + ' / ' + readyTotal;
   }
 
+  /* ---------- 术语首次出现链接（B 级：顺带名词，只挂链接不放假） ---------- */
+
+  var TERM_SKIP_PAGES = { 'glossary': 1, 'cheatsheet': 1 };
+
+  function termExcluded(node) {
+    var el = node.parentElement;
+    if (!el) return true;
+    return !!el.closest('pre, code, a, h1, h2, h3, h4, .diagram, .callout.term, .code-head');
+  }
+
+  function termIndexOf(text, name) {
+    var i = text.indexOf(name);
+    while (i >= 0) {
+      var before = i > 0 ? text.charAt(i - 1) : '';
+      var after = text.charAt(i + name.length) || '';
+      if (!/[A-Za-z0-9_]/.test(before) && !/[A-Za-z0-9_]/.test(after)) return i;
+      i = text.indexOf(name, i + 1);
+    }
+    return -1;
+  }
+
+  function termBoxed(content, name) {
+    var titles = content.querySelectorAll('.callout.term .callout-title');
+    for (var i = 0; i < titles.length; i++) {
+      if (titles[i].textContent.indexOf(name) >= 0) return true;
+    }
+    return false;
+  }
+
+  function initTermLinks() {
+    var content = document.querySelector('.content');
+    if (!content || !K8C.terms) return;
+    var page = document.body.getAttribute('data-page');
+    if (TERM_SKIP_PAGES[page]) return;
+    var cur = K8C.chapterById(page);
+
+    var terms = K8C.terms.slice().sort(function (a, b) { return b.name.length - a.name.length; });
+
+    terms.forEach(function (term) {
+      var ch = K8C.chapterById(term.target);
+      if (!ch) return;
+      if (cur && cur.file === ch.file) return;        /* 本页就是详解章，不挂自链 */
+      if (termBoxed(content, term.name)) return;     /* 本页的名词提示框已覆盖 */
+      var walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT, null);
+      var node;
+      while ((node = walker.nextNode())) {
+        if (termExcluded(node)) continue;
+        var idx = termIndexOf(node.nodeValue, term.name);
+        if (idx < 0) continue;
+        var range = document.createRange();
+        range.setStart(node, idx);
+        range.setEnd(node, idx + term.name.length);
+        var a = document.createElement('a');
+        a.className = 'term-link';
+        a.href = ch.file;
+        a.title = '详见 ' + ch.num + ' · ' + ch.title;
+        range.surroundContents(a);
+        break;                                        /* 每术语每页只链一次 */
+      }
+    });
+  }
+
   /* ---------- 启动 ---------- */
 
   document.addEventListener('DOMContentLoaded', function () {
@@ -334,6 +396,7 @@
     initNavToggle();
     initTopbarTitle();
     initPageToc();
+    initTermLinks();
     initCodeBlocks();
     initChapterNav();
     initMarkDone();

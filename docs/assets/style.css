@@ -110,6 +110,9 @@ img, canvas, svg { max-width: 100%; }
 
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
+/* B 级术语链接：次级导航，与普通链接视觉区分 */
+a.term-link { color: var(--text-soft); border-bottom: 1px dashed var(--border-strong); }
+a.term-link:hover { color: var(--accent); border-color: var(--accent-line); }
 
 /* 无障碍：跳转链接 */
 .skip-link {
