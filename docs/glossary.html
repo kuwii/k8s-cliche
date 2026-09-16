@@ -137,6 +137,7 @@
             <tr><td>PV / PVC / StorageClass</td><td>PV / PVC / StorageClass</td><td>存储本体 / 申请单 / 创建配方</td></tr>
             <tr><td>Probe（liveness/readiness/startup）</td><td>探针（存活/就绪/启动）</td><td>管生死 / 管流量 / 管慢启动</td></tr>
             <tr><td>requests / limits</td><td>requests / limits（请求量/限制量）</td><td>调度依据与保障 / 使用上限</td></tr>
+            <tr><td>HPA（HorizontalPodAutoscaler）</td><td>HPA（水平 Pod 自动扩缩容）</td><td>按利用率自动调副本数的控制器；前提是设了 requests</td></tr>
             <tr><td>QoS Class</td><td>服务质量等级</td><td>Guaranteed / Burstable / BestEffort，决定驱逐顺序</td></tr>
             <tr><td>Eviction</td><td>驱逐</td><td>节点压力下 kubelet 主动杀 Pod 腾资源</td></tr>
             <tr><td>Taint / Toleration</td><td>污点 / 容忍</td><td>节点拒客 / Pod 获准进入</td></tr>

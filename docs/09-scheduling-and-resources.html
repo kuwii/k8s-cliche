@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>09 · 调度与资源 · k8s-cliche</title>
-<meta name="description" content="requests / limits、QoS 与驱逐、过滤打分、亲和性、污点与容忍。">
+<meta name="description" content="requests / limits、QoS 与驱逐、HPA 自动扩缩容、过滤打分、亲和性、污点与容忍。">
 <script>
 (function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
 </script>
@@ -65,11 +65,11 @@
     <article class="content">
       <span class="chapter-eyebrow">专题 · 第 09 章</span>
       <h1>调度与资源</h1>
-      <p class="lede">两个问题：装不装得下（resources / QoS），放哪儿（filter / score / 亲和 / 污点）。</p>
+      <p class="lede">三个问题：装不装得下（resources / QoS）、要不要加副本（HPA）、放哪儿（filter / score / 亲和 / 污点）。</p>
 
       <div class="tldr">
         <div class="tldr-label">一句话答案</div>
-        <p><code>requests</code> 是<strong>调度依据与最低保障</strong>，<code>limits</code> 是<strong>使用上限</strong>；两者组合决定 QoS 等级，QoS 决定节点压力时<strong>谁先被驱逐</strong>。 placement 侧则是：过滤（硬性条件）→ 打分（软性偏好）→ 绑定。</p>
+        <p><code>requests</code> 是<strong>调度依据与最低保障</strong>，<code>limits</code> 是<strong>使用上限</strong>；两者组合决定 QoS 等级，QoS 决定节点压力时<strong>谁先被驱逐</strong>。反向的反应是 HPA：利用率超标就自动加副本。placement 侧则是：过滤（硬性条件）→ 打分（软性偏好）→ 绑定。</p>
       </div>
 
       <h2 id="requests-limits">requests 与 limits 的准确语义</h2>
@@ -104,6 +104,45 @@
         </table>
       </div>
       <p><strong>驱逐（Eviction）</strong>是 kubelet 在节点资源压力下的主动行为：按 QoS 等级 + 超用比例挑 Pod 杀掉腾空间，Pod 状态变为 <code>Evicted</code>。它与 OOM Kill 的区别：OOM Kill 是<strong>单容器</strong>超自己的 limit；驱逐是<strong>节点级</strong>压力下的取舍。</p>
+
+      <h2 id="autoscaling">HPA：超载的第二种反应</h2>
+      <p>上一节「节点压力」的答案是驱逐——防御性的。但还有另一种更主动的应对「不够用」：<strong>加副本</strong>。这就是 <strong>Horizontal Pod Autoscaler（HPA）</strong>：一个根据指标持续调整 Deployment 副本数的控制器。它是第 00 章「流量变了怎么办」的标准答案。</p>
+      <p>本质还是第 01 章那个循环：期望值 = 按指标算出的目标副本数，实际值 = 当前副本数，有差异就调谐。</p>
+      <div class="code-block" data-lang="yaml" data-file="hpa.yaml">
+<pre><code>apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+spec:
+  scaleTargetRef:
+    kind: Deployment
+    name: web
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization      # 目标：平均利用率 70%
+        averageUtilization: 70</code></pre>
+      </div>
+      <div class="callout note">
+        <div class="callout-title">核心公式：期望副本 = ceil(当前副本 × 当前利用率 ÷ 目标利用率)</div>
+        <ul>
+          <li>利用率 = 所有容器平均用量 <strong>÷ requests 总和</strong>——注意分母是 <strong>requests</strong>，不是 limits，也不是机器容量</li>
+          <li>例：3 副本、目标 70%，实际利用率升到 91% → 期望 = 3 × 91 ÷ 70 ≈ 3.9 → 向上取整 4</li>
+        </ul>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>现象</th><th>解释</th></tr></thead>
+          <tbody>
+            <tr><td>没设 requests，HPA 不动也不报警</td><td>没有 requests 利用率无法定义，HPA 直接不工作——设置 requests 是前提</td></tr>
+            <tr><td>扩得快、缩得慢</td><td>缩容默认有 300 秒稳定窗口，防瞬时尖峰引起震荡；扩容立即生效</td></tr>
+            <tr><td>指标从哪来</td><td>HPA 控制器（在 kube-controller-manager 里）读 metrics-server 聚合的指标；没有 metrics-server 就没有 HPA</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>内存利用率也能做指标，但 CPU 最常用。纵向扩缩（调大单个 Pod 的 requests）是另一套机制，此处不展开。</p>
 
       <h2 id="pipeline">放置：过滤 → 打分</h2>
       <figure class="diagram" id="fig-sched">
@@ -156,6 +195,18 @@
         </div>
       </div>
 
+      <p><strong>Q2：HPA 工作的前提条件？机制是什么？</strong></p>
+      <div class="answer-compare">
+        <div class="answer bad">
+          <div class="answer-head">✕ 平庸答案</div>
+          <div class="answer-body"><p>「HPA 会观察 CPU 使用率，自动加减副本。」</p><p>——只复述功能。追问「利用率的分母是什么？指标谁读？为什么不立刻缩容？」就答不上来。</p></div>
+        </div>
+        <div class="answer good">
+          <div class="answer-head">✓ 加分答案</div>
+          <div class="answer-body"><p>「三个前提：一、必须设了 requests——利用率定义为用量 ÷ requests，没设 requests HPA 没有分母，直接不工作；二、metrics-server 在跑，提供指标数据；三、扩缩对象是可伸缩对象（如 Deployment）。机制还是那个控制循环：HPA 控制器读指标、算出期望副本数、写进 spec.replicas。缩容默认有 300 秒稳定窗口防震荡，扩容立即生效。」</p></div>
+        </div>
+      </div>
+
       <h2 id="myths">常见误区</h2>
       <div class="myth">
         <div class="myth-q">误区一：limits 设得越大越安全</div>
@@ -169,10 +220,15 @@
         <div class="myth-q">误区三：Pod 被 Evicted = 应用有 bug</div>
         <p class="myth-a">驱逐是节点压力下的资源决策，与应用对错无关。查 <code>kubectl describe node</code> 的压力条件与 QoS 分布，而不是查代码。</p>
       </div>
+      <div class="myth">
+        <div class="myth-q">误区四：设了 limits，HPA 就会更准</div>
+        <p class="myth-a">HPA 利用率的分母是 requests，不是 limits。limits 只影响 QoS（驱逐顺序），不影响 HPA 的计算。只设 limits 不设 requests，HPA 根本不工作。</p>
+      </div>
 
       <h2 id="further">延伸</h2>
       <ul>
         <li><a href="https://kubernetes.io/docs/concepts/scheduling-eviction/" rel="noopener">官方文档 · Scheduling &amp; Eviction</a></li>
+        <li><a href="https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/" rel="noopener">官方文档 · Horizontal Pod Autoscaling</a></li>
         <li>调度在 Pod 旅程中的位置：<a href="03-birth-of-a-pod.html">03 · 一个 Pod 的诞生</a> ③ 站</li>
       </ul>
 

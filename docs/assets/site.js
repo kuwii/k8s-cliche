@@ -37,7 +37,7 @@ K8C.chapters = [
   { group:'topic', num:'08', file:'08-config-and-secret.html', title:'配置与密钥',
     desc:'ConfigMap / Secret，配置注入的几种方式与热更新问题', mins:12, ready:true },
   { group:'topic', num:'09', file:'09-scheduling-and-resources.html', title:'调度与资源',
-    desc:'requests / limits、QoS、亲和性、污点与容忍', mins:18, ready:true },
+    desc:'requests / limits、QoS、HPA 自动扩缩容、亲和性、污点与容忍', mins:18, ready:true },
   { group:'topic', num:'10', file:'10-security.html', title:'安全',
     desc:'RBAC、ServiceAccount、NetworkPolicy、Pod 安全准入', mins:15, ready:true },
   { group:'topic', num:'11', file:'11-extensibility.html', title:'扩展机制',
@@ -91,6 +91,7 @@ K8C.terms = [
   { name:'亲和性', target:'09' },
   { name:'QoS', target:'09' },
   { name:'驱逐', target:'09' },
+  { name:'HPA', target:'09' },
   { name:'CRD', target:'11' },
   { name:'Operator', target:'11' }
 ];
