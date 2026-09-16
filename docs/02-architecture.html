@@ -79,7 +79,7 @@
 
       <figure class="diagram" id="fig-arch">
         <div class="diagram-canvas-wrap"></div>
-        <figcaption class="diagram-caption"><b>集群全景</b>：控制平面做决定，节点干活；kubectl、kubelet、scheduler 全都只与 API Server 通信（第 00 章模型四）</figcaption>
+        <figcaption class="diagram-caption"><b>集群全景</b>：控制平面做决定，节点干活；kubectl、kubelet、scheduler 全都只与 API Server 通信（第 01 章模型四）</figcaption>
       </figure>
 
       <p>图里只有两类盒子：<strong>做决定的</strong>（控制平面）和<strong>干活的</strong>（节点）。下面逐个过。</p>
@@ -100,10 +100,10 @@
       <h3 id="scheduler">kube-scheduler —— 只写答案，不动手</h3>
       <p>监听「还没分配节点的 Pod」，为它选一个节点，然后把 <code>nodeName</code> 写回 API Server。完事。</p>
       <p>选择过程两阶段：<strong>过滤（Filter）</strong>——剔除不满足条件的节点（资源不够、污点不容忍）；<strong>打分（Score）</strong>——给剩下的节点排序，选最优。</p>
-      <p>关键认知：<strong>scheduler 不启动任何东西</strong>。它只做一个绑定（bind）动作。真正拉起容器的是节点上的 kubelet——两者从头到尾没有直接通信（第 00 章模型四的例子）。</p>
+      <p>关键认知：<strong>scheduler 不启动任何东西</strong>。它只做一个绑定（bind）动作。真正拉起容器的是节点上的 kubelet——两者从头到尾没有直接通信（第 01 章模型四的例子）。</p>
 
       <h3 id="controller-manager">kube-controller-manager —— 控制循环的集合体</h3>
-      <p>第 00 章说「每个控制器都是一个调谐循环」。这个进程里跑着几十个内置控制器：</p>
+      <p>第 01 章说「每个控制器都是一个调谐循环」。这个进程里跑着几十个内置控制器：</p>
       <ul>
         <li><strong>Deployment / ReplicaSet 控制器</strong>：维持副本数</li>
         <li><strong>Node 控制器</strong>：盯着节点心跳，节点失联就标记、驱逐其上的 Pod</li>
@@ -130,7 +130,7 @@
       <p>规则写进内核之后，流量由内核的 netfilter 直接转发，kube-proxy 进程本身一个包都不碰。它是个「规则维护员」，不是「代理」。叫这个名字是历史遗留。</p>
 
       <h3 id="runtime">容器运行时 —— 真正跑容器的</h3>
-      <p>containerd、CRI-O 等，实现 CRI 接口。拉镜像、创建隔离环境、启动进程——所有「真正发生」的事都在这一层。K8s 控制平面从头到尾不碰容器（第 01 章误区三）。</p>
+      <p>containerd、CRI-O 等，实现 CRI 接口。拉镜像、创建隔离环境、启动进程——所有「真正发生」的事都在这一层。K8s 控制平面从头到尾不碰容器（第 00 章误区三）。</p>
 
       <!-- ==================== -addon ==================== -->
       <h2 id="addons">附加组件：不是内置的，但几乎是必需的</h2>
@@ -168,7 +168,7 @@
 
       <div class="callout info">
         <div class="callout-title">一个贯穿全表的规律</div>
-        <p>控制平面的故障影响<strong>「未来的变更」</strong>，节点数据路径的故障影响<strong>「当前的流量」</strong>。两者解耦（第 00 章模型四）的直接红利就是：大脑短暂罢工，四肢还能继续动。</p>
+        <p>控制平面的故障影响<strong>「未来的变更」</strong>，节点数据路径的故障影响<strong>「当前的流量」</strong>。两者解耦（第 01 章模型四）的直接红利就是：大脑短暂罢工，四肢还能继续动。</p>
       </div>
 
       <hr class="sep">

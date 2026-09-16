@@ -71,7 +71,7 @@
       <div class="tldr">
         <div class="tldr-label">一句话答案</div>
         <p>一份 YAML 的旅程：<strong>kubectl → apiserver（三道关卡）→ etcd 落库 → scheduler 绑定节点 → 该节点 kubelet 接单 → CRI 拉镜像起容器（CNI 配网络）→ 探针通过 → 状态回写 → Service 发现它</strong>。</p>
-        <p>全程<strong>没有任何两个组件直接对话</strong>。它们只是轮流读写 API Server 上的同一份记录。这一章是第 00 章四条模型的同一次演出。</p>
+        <p>全程<strong>没有任何两个组件直接对话</strong>。它们只是轮流读写 API Server 上的同一份记录。这一章是第 01 章四条模型的同一次演出。</p>
       </div>
 
       <!-- ==================== 为什么 ==================== -->
@@ -82,7 +82,7 @@
       <!-- ==================== 出发前 ==================== -->
       <h2 id="before">出发之前：你提交的到底是什么</h2>
       <p><code>kubectl apply -f deployment.yaml</code> 时，kubectl 做的事很简单：读 YAML，把它转换成一次对 API Server 的 <strong>REST 请求</strong>。</p>
-      <p>YAML 只是序列化格式。真正被提交的是一个 <strong>API 对象</strong>（第 00 章模型二）：带 <code>apiVersion / kind / metadata / spec</code> 的结构化数据。kubectl 本身不理解调度、不理解容器——它只是个 HTTP 客户端。</p>
+      <p>YAML 只是序列化格式。真正被提交的是一个 <strong>API 对象</strong>（第 01 章模型二）：带 <code>apiVersion / kind / metadata / spec</code> 的结构化数据。kubectl 本身不理解调度、不理解容器——它只是个 HTTP 客户端。</p>
       <div class="callout note">
         <div class="callout-title">顺带解开一个常见困惑</div>
         <p><code>apply</code> 与 <code>create</code> 的区别不在「格式」而在语义：<code>create</code> 是「新建这个对象」，已存在就报错；<code>apply</code> 是「让集群状态等于这份声明」，存在则更新。后者才是声明式的用法，也是 GitOps 的基础动作。</p>
@@ -122,7 +122,7 @@
 
       <h3 id="stage-4">④ kubelet 接单：靠 watch，不靠通知</h3>
       <p>没有任何人「通知」kubelet。每个节点的 kubelet 都在 watch「<code>nodeName</code> 等于我的 Pod」。绑定写入的那一瞬，目标节点的 kubelet 看到了变化，把活领走。</p>
-      <p>这是第 00 章模型四的标准动作：协作 = 各自监听同一份数据。</p>
+      <p>这是第 01 章模型四的标准动作：协作 = 各自监听同一份数据。</p>
 
       <h3 id="stage-5">⑤ CRI：拉镜像、建沙箱、起容器</h3>
       <p>kubelet 调用容器运行时（CRI 接口），运行时依次：</p>
@@ -150,7 +150,7 @@
       <p>下一跳开始，Service 的负载均衡规则里有了这个 Pod——<strong>它正式可以接客了</strong>。</p>
 
       <h3 id="stage-9">⑨ 之后：永不停歇的循环</h3>
-      <p>旅程没有终点。kubelet 继续汇报、探针继续探测、控制器继续调谐。Pod 的「一生」就是第 00 章那个循环的一次实例化。</p>
+      <p>旅程没有终点。kubelet 继续汇报、探针继续探测、控制器继续调谐。Pod 的「一生」就是第 01 章那个循环的一次实例化。</p>
 
       <!-- ==================== 动画复盘 ==================== -->
       <h2 id="replay">复盘：看它走一遍</h2>
@@ -243,7 +243,7 @@
       <ul>
         <li><a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/" rel="noopener">官方文档 · Pod Lifecycle</a></li>
         <li><a href="https://kubernetes.io/docs/concepts/architecture/cloud-controller/" rel="noopener">官方文档 · 组件交互细节</a></li>
-        <li>主线完结。接下来按兴趣进入专题：<a href="06-networking.html">06 · 网络</a> 与 <a href="09-scheduling-and-resources.html">09 · 调度与资源</a>（施工中）是本章两段的深挖</li>
+        <li>主线完结。接下来按兴趣进入专题：<a href="06-networking.html">06 · 网络</a> 与 <a href="09-scheduling-and-resources.html">09 · 调度与资源</a>是本章两段的深挖</li>
       </ul>
 
       <div class="mark-done">

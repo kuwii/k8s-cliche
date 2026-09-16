@@ -28,6 +28,9 @@
   --info: #0b6b8a;
   --info-bg: #e8f5f9;
 
+  --term: #6d4fc2;
+  --term-bg: rgba(109, 79, 194, .08);
+
   --code-bg: #f4f6fa;
   --code-text: #24292f;
 
@@ -72,6 +75,9 @@ html[data-theme="dark"] {
   --danger-bg: rgba(240, 138, 128, .12);
   --info: #6fc3dd;
   --info-bg: rgba(111, 195, 221, .12);
+
+  --term: #a98fe8;
+  --term-bg: rgba(169, 143, 232, .12);
 
   --code-bg: #111823;
   --code-text: #d7e0ee;
@@ -549,6 +555,8 @@ html[data-theme="dark"] .tok-flag { color: #f0a06a; }
 .callout.info .callout-title { color: var(--info); }
 .callout.note   { background: var(--accent-soft); border-color: var(--accent); }
 .callout.note .callout-title { color: var(--accent); }
+.callout.term   { background: var(--term-bg);   border-color: var(--term); }
+.callout.term .callout-title { color: var(--term); }
 
 /* ---------- 13. 「一句话答案」卡片 ---------- */
 .tldr {

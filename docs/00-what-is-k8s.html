@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>01 · K8s 是什么 · k8s-cliche</title>
+<title>00 · K8s 是什么 · k8s-cliche</title>
 <meta name="description" content="Kubernetes 解决什么问题、和 Docker 是什么关系、什么场景该用（和不该用）。">
 <script>
 (function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="assets/style.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23326ce5' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23326ce5'/%3E%3C/svg%3E">
 </head>
-<body data-page="01">
+<body data-page="00">
 <a class="skip-link" href="#top">跳到正文</a>
 <div id="progress"></div>
 
@@ -64,7 +64,7 @@
   <main class="main" id="top">
     <article class="content">
 
-      <span class="chapter-eyebrow">主线 · 第 01 章</span>
+      <span class="chapter-eyebrow">主线 · 第 00 章</span>
       <h1>K8s 是什么</h1>
       <p class="lede">在学「怎么用」之前，先搞清楚「它凭什么存在」。</p>
 
@@ -106,7 +106,7 @@
 
       <!-- ==================== 它干什么 ==================== -->
       <h2 id="what-it-does">K8s 具体干什么：用你的话翻译</h2>
-      <p>K8s 的接口是声明式的（见<a href="00-how-it-works.html">第 00 章</a>）。感受一下这个「翻译」过程：</p>
+      <p>K8s 的接口是声明式的（见<a href="01-how-it-works.html">第 01 章</a>）。感受一下这个「翻译」过程：</p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>你说（期望状态）</th><th>K8s 做（持续维持）</th></tr></thead>
@@ -121,7 +121,12 @@
           </tbody>
         </table>
       </div>
-      <p>注意右列的动词都是<strong>持续性</strong>的：盯着、维护、跟着。这不是「执行一次命令」，而是「维持一个状态」——第 00 章的模型一。</p>
+      <div class="callout term">
+        <div class="callout-title">📖 名词提示 · Service / Deployment</div>
+        <p><strong>Service</strong>：一组 Pod 的稳定虚拟入口。Pod 随时可能死掉重建、IP 一直在变，Service 用固定的名字和地址替你挡住这些变化（<a href="06-networking.html">06 · 网络</a> 细说）。</p>
+        <p><strong>Deployment</strong>：你声明「要 N 个副本」的入口对象，K8s 负责持续维持这个数字（<a href="05-workloads.html">05 · 工作负载</a> 细说）。</p>
+      </div>
+      <p>注意右列的动词都是<strong>持续性</strong>的：盯着、维护、跟着。这不是「执行一次命令」，而是「维持一个状态」——第 01 章的模型一。</p>
 
       <!-- ==================== 和 Docker 的关系 ==================== -->
       <h2 id="docker">和 Docker 是什么关系</h2>
@@ -231,7 +236,7 @@
       </ul>
 
       <div class="mark-done">
-        <button type="button" data-chapter="01">读完本章，打个卡</button>
+        <button type="button" data-chapter="00">读完本章，打个卡</button>
       </div>
 
       <nav class="chapter-nav" id="chapterNav" aria-label="章节导航"></nav>

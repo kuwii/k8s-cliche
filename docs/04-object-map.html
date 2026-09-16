@@ -118,7 +118,7 @@
 
       <h3 id="owner-chain">所有权链：Deployment → ReplicaSet → Pod</h3>
       <p>Deployment 不直接管 Pod。它管 ReplicaSet，ReplicaSet 管 Pod。中间这层的意义是<strong>滚动更新</strong>：新版本 = 新 ReplicaSet，旧的缩到 0 但保留，回滚就是切回去。</p>
-      <p>所有权由 <code>ownerReferences</code> 字段表达，它是<strong>级联删除</strong>的依据：删 Deployment，它的 ReplicaSet 和 Pod 会被垃圾回收一起删掉。第 00 章说「K8s 没有从属关系只有标签」——所有权是这句话的唯一例外补充：<em>选择靠标签，生死靠 ownerReferences</em>。</p>
+      <p>所有权由 <code>ownerReferences</code> 字段表达，它是<strong>级联删除</strong>的依据：删 Deployment，它的 ReplicaSet 和 Pod 会被垃圾回收一起删掉。第 01 章说「K8s 没有从属关系只有标签」——所有权是这句话的唯一例外补充：<em>选择靠标签，生死靠 ownerReferences</em>。</p>
 
       <h3 id="select-chain">选择链：Service → EndpointSlice → Pod</h3>
       <p>Service 只存选择器；EndpointSlice 控制器把匹配且 <strong>Ready</strong> 的 Pod 写成后端列表。注意 Ready 这个条件——readiness 探针失败的 Pod 不在列表里，这是「Service 不通」的高频真凶（第 03 章误区五）。</p>

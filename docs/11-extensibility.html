@@ -70,7 +70,7 @@
       <div class="tldr">
         <div class="tldr-label">一句话答案</div>
         <p>三种扩展点：<strong>CRD</strong> 注册新资源类型（数据面扩展），<strong>Operator = CRD + 控制器</strong>（把运维知识编码成控制循环），<strong>Admission Webhook</strong> 在请求路径上加自定义关卡（策略面扩展）。</p>
-        <p>它们复用的全是内置组件的同款机制——这正是第 00 章「一切皆资源」的红利。</p>
+        <p>它们复用的全是内置组件的同款机制——这正是第 01 章「一切皆资源」的红利。</p>
       </div>
 
       <h2 id="crd">CRD：往 API 里注册新资源</h2>
@@ -96,7 +96,7 @@
       <ul>
         <li><strong>Informer</strong>：对 API Server 做 List-Watch——先全量列一次建本地缓存，之后增量接收变更事件。控制器读的是<strong>本地缓存</strong>，不打 API Server</li>
         <li><strong>WorkQueue</strong>：事件入队、去重、限速、失败重试。同一个对象短时间变更十次，队列里只处理一次最新</li>
-        <li><strong>Reconcile</strong>：从队列取 key，读期望与实际，做最小动作写回——就是第 00 章那个循环的工程形态</li>
+        <li><strong>Reconcile</strong>：从队列取 key，读期望与实际，做最小动作写回——就是第 01 章那个循环的工程形态</li>
       </ul>
       <p>工具链定位：<code>client-go</code> 是底层库；<code>controller-runtime</code> 把 Informer/Queue/Manager 打包成易用抽象；<code>kubebuilder</code> / <code>operator-sdk</code> 是脚手架，生成 CRD 清单与控制器骨架。</p>
 
@@ -152,7 +152,7 @@
       <ul>
         <li><a href="https://kubernetes.io/docs/concepts/extend-kubernetes/" rel="noopener">官方文档 · Extending Kubernetes</a></li>
         <li><a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/" rel="noopener">官方文档 · Dynamic Admission Control</a></li>
-        <li>控制循环的思想源头：<a href="00-how-it-works.html">00 · 工作原理</a> 模型一</li>
+        <li>控制循环的思想源头：<a href="01-how-it-works.html">01 · 工作原理</a> 模型一</li>
       </ul>
 
       <div class="mark-done">

@@ -12,12 +12,12 @@ K8C.groups = [
 
 K8C.chapters = [
   /* ---- 主线 ---- */
-  { group:'main', num:'00', file:'00-how-it-works.html', title:'工作原理',
-    desc:'四条贯穿 K8s 的核心思想。理解了它们，80% 的 K8s 对象可以自己推导出来',
-    mins:18, ready:true },
-  { group:'main', num:'01', file:'01-what-is-k8s.html', title:'K8s 是什么',
+  { group:'main', num:'00', file:'00-what-is-k8s.html', title:'K8s 是什么',
     desc:'它解决什么问题、和 Docker 是什么关系、什么场景该用（不该用）',
     mins:12, ready:true },
+  { group:'main', num:'01', file:'01-how-it-works.html', title:'工作原理',
+    desc:'四条贯穿 K8s 的核心思想。理解了它们，80% 的 K8s 对象可以自己推导出来',
+    mins:18, ready:true },
   { group:'main', num:'02', file:'02-architecture.html', title:'架构总览',
     desc:'控制平面与节点组件的职责划分，每个组件是干什么的',
     mins:15, ready:true },

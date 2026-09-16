@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>00 · 工作原理 · k8s-cliche</title>
+<title>01 · 工作原理 · k8s-cliche</title>
 <meta name="description" content="K8s 的四条核心工作原理：声明式与控制循环、一切皆资源、标签与选择器、中心辐射架构。">
 <script>
 (function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="assets/style.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23326ce5' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23326ce5'/%3E%3C/svg%3E">
 </head>
-<body data-page="00">
+<body data-page="01">
 <a class="skip-link" href="#top">跳到正文</a>
 <div id="progress"></div>
 
@@ -64,7 +64,7 @@
   <main class="main" id="top">
     <article class="content">
 
-      <span class="chapter-eyebrow">主线 · 第 00 章</span>
+      <span class="chapter-eyebrow">主线 · 第 01 章</span>
       <h1>工作原理</h1>
       <p class="lede">在记住任何 YAML 之前，先记住这四条。</p>
 
@@ -78,6 +78,11 @@
       <h2 id="why">为什么需要这一章</h2>
       <p>K8s 的学习曲线陡峭，但陡峭的地方往往不在「难」，而在「反直觉」。</p>
       <p>很多人学 K8s 的方式是逐个背对象：Pod 是什么、Service 是什么、Deployment 是什么……背到第十个就崩了，因为对象之间有微妙的关联，而死记硬背抓不住这些关联。</p>
+
+      <div class="callout term">
+        <div class="callout-title">📖 名词提示 · Pod</div>
+        <p>K8s 的最小调度单位：一组共享网络与存储的容器。你说「跑 3 个副本」，在 K8s 里就是「维持 3 个 Pod」——后文一切都以 Pod 为基本单位谈（<a href="03-birth-of-a-pod.html">03 · 一个 Pod 的诞生</a> 细说）。</p>
+      </div>
       <p>真实情况是：<strong>K8s 的核心概念很少，对象很多。</strong>对象只是同一套思想在不同场景下的具体化。所以正确的顺序是先拿到思想，再去认对象——那时候你会发现它们长得都很像。</p>
 
       <div class="card-grid" style="margin-bottom:24px">
@@ -146,6 +151,11 @@ spec:
       </div>
       <p>举例：ReplicaSet 控制器不断检查「期望 3 个副本，实际几个」。少了就创建，多了就删除。<strong>它不关心为什么少了</strong>——可能是节点宕机、可能是你手动删了、可能是探针失败被重启——它只关心差异，然后消除差异。</p>
 
+      <div class="callout term">
+        <div class="callout-title">📖 名词提示 · ReplicaSet</div>
+        <p>Deployment 和 Pod 之间的执行层：Deployment 说「要 3 个」，ReplicaSet 负责让实际数量始终是 3。先记住它存在即可（<a href="05-workloads.html">05 · 工作负载</a> 细说）。</p>
+      </div>
+
       <h3 id="model-1-explains">这解释了什么</h3>
       <p>一旦接受这个模型，很多现象就不需要单独记忆了：</p>
       <div class="table-wrap">
@@ -158,6 +168,11 @@ spec:
             <tr><td>节点挂了，上面的 Pod 自动跑到别处</td><td>控制器发现副本数不足，补上了</td></tr>
           </tbody>
         </table>
+      </div>
+
+      <div class="callout term">
+        <div class="callout-title">📖 名词提示 · kubectl</div>
+        <p>K8s 的命令行客户端：你敲的每条命令，本质都是发给 API Server 的 HTTP 请求。它本身不理解调度、不理解容器（<a href="12-ops-and-troubleshooting.html">12 · 运维与排障</a> 细说）。</p>
       </div>
 
       <h3 id="eventual-consistency">一个重要的推论：最终一致</h3>
@@ -293,6 +308,11 @@ metadata:
       <h3 id="only-apiserver">只有 API Server 能碰 etcd</h3>
       <p>K8s 的所有组件——调度器、各种控制器、kubelet、kubectl——<strong>彼此之间不直接通信</strong>。它们只和 API Server 说话。</p>
 
+      <div class="callout term">
+        <div class="callout-title">📖 名词提示 · API Server / etcd</div>
+        <p><strong>API Server</strong>：K8s 唯一的入口，所有组件（包括你）只和它通信。<strong>etcd</strong>：分布式键值存储，集群状态的唯一真相来源，而能读写它的只有 API Server。两者是 <a href="02-architecture.html">02 · 架构总览</a> 的主角。</p>
+      </div>
+
       <figure class="diagram" id="fig-hub">
         <div class="diagram-canvas-wrap"></div>
         <figcaption class="diagram-caption"><b>中心辐射（Hub-and-Spoke）</b>：API Server 是唯一的中枢，也是唯一能读写 etcd 的组件；其余组件只与它通信</figcaption>
@@ -397,12 +417,12 @@ metadata:
       <h2 id="further">延伸</h2>
       <ul>
         <li><a href="https://kubernetes.io/docs/concepts/" rel="noopener">Kubernetes 官方文档 · Concepts</a></li>
-        <li>控制循环的实现细节（Informer、WorkQueue），见本项目 <a href="11-extensibility.html">11 · 扩展机制</a>（施工中）</li>
-        <li>想看这四条模型如何在真实流程中协同，见 <a href="03-birth-of-a-pod.html">03 · 一个 Pod 的诞生</a>（施工中）</li>
+        <li>控制循环的实现细节（Informer、WorkQueue），见本项目 <a href="11-extensibility.html">11 · 扩展机制</a></li>
+        <li>想看这四条模型如何在真实流程中协同，见 <a href="03-birth-of-a-pod.html">03 · 一个 Pod 的诞生</a></li>
       </ul>
 
       <div class="mark-done">
-        <button type="button" data-chapter="00">读完本章，打个卡</button>
+        <button type="button" data-chapter="01">读完本章，打个卡</button>
       </div>
 
       <nav class="chapter-nav" id="chapterNav" aria-label="章节导航"></nav>
