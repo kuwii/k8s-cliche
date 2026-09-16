@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>01 · 工作原理 · k8s-cliche</title>
-<meta name="description" content="K8s 的四条核心工作原理：声明式与控制循环、一切皆资源、标签与选择器、中心辐射架构。">
+<meta name="description" content="K8s 的四条核心工作原理：一切皆资源、声明式与控制循环、标签与选择器、中心辐射架构。">
 <script>
 (function(){try{var q=new URLSearchParams(location.search).get('theme');var s=localStorage.getItem('k8c-theme');var t=q||s||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(q)try{localStorage.setItem('k8c-theme',q);}catch(e2){}}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
 </script>
@@ -70,7 +70,7 @@
 
       <div class="tldr">
         <div class="tldr-label">一句话答案</div>
-        <p>Kubernetes 的全部设计建立在四个思想之上：<strong>声明式 + 控制循环</strong>、<strong>一切皆资源</strong>、<strong>标签解耦</strong>、<strong>中心辐射架构</strong>。</p>
+        <p>Kubernetes 的全部设计建立在四个思想之上：<strong>一切皆资源</strong>、<strong>声明式 + 控制循环</strong>、<strong>标签解耦</strong>、<strong>中心辐射架构</strong>。</p>
         <p>理解了这四条，K8s 里绝大多数对象和行为你都能自己推导出来，不需要背。</p>
       </div>
 
@@ -88,13 +88,13 @@
       <div class="card-grid" style="margin-bottom:24px">
         <div class="model-card">
           <span class="model-num">模型一</span>
-          <h3>声明式 + 控制循环</h3>
-          <p>你描述期望，系统持续地让现实逼近期望。这是「自愈」的来源，是 K8s 的灵魂。</p>
+          <h3>一切皆资源</h3>
+          <p>所有东西都是带 spec / status 的 API 对象，用统一的 REST API 读写。</p>
         </div>
         <div class="model-card">
           <span class="model-num">模型二</span>
-          <h3>一切皆资源</h3>
-          <p>所有东西都是带 spec / status 的 API 对象，用统一的 REST API 读写。</p>
+          <h3>声明式 + 控制循环</h3>
+          <p>你描述期望，系统持续地让现实逼近期望。这是「自愈」的来源，是 K8s 的灵魂。</p>
         </div>
         <div class="model-card">
           <span class="model-num">模型三</span>
@@ -111,7 +111,56 @@
       <hr class="sep">
 
       <!-- ==================== 模型一 ==================== -->
-      <h2 id="model-1">模型一：声明式 + 控制循环</h2>
+      <h2 id="model-1">模型一：一切皆资源</h2>
+      <p>K8s 可以被理解为：<strong>一个分布式的键值存储，加上一群不断调谐它的控制器。</strong></p>
+      <p>所有东西——Pod、Service、Node、乃至权限规则——都被抽象成<strong>资源（Resource）</strong>，也叫 <strong>API 对象（API Object）</strong>，通过统一的 REST API 读写。</p>
+
+      <h3 id="unified-skeleton">统一的骨架</h3>
+      <p>几乎每个 K8s 对象都长这样：</p>
+      <div class="code-block" data-lang="yaml" data-file="deployment.yaml">
+<pre><code>apiVersion: apps/v1      # 属于哪个 API 组、哪个版本
+kind: Deployment         # 是什么类型
+metadata:                # 元信息：名字、命名空间、标签……
+  name: web
+  namespace: default
+  labels:
+    app: web
+spec:                    # ★ 期望状态：你想让它变成什么样（你写）
+  replicas: 3
+status:                  # ★ 实际状态：它现在实际是什么样（K8s 写）
+  readyReplicas: 2</code></pre>
+      </div>
+
+      <div class="callout note">
+        <div class="callout-title">spec 与 status 的分离是理解 K8s 的关键</div>
+        <ul>
+          <li><code>spec</code> 由<strong>你</strong>（或 Helm、控制器）写入，描述期望</li>
+          <li><code>status</code> 由 <strong>K8s 组件</strong>写入，描述现实</li>
+          <li>控制循环做的事，就是让 <code>status</code> 不断逼近 <code>spec</code></li>
+        </ul>
+        <p>往下看「声明式 + 控制循环」，会发现它就是这个模型的机制实现——两个模型是咬合的。</p>
+      </div>
+
+      <p>📌 <strong>实用推论</strong>：排查问题时，<code>kubectl get xxx -o yaml</code> 里<strong>先看 <code>status</code></strong>。期望与现实的差距，往往直接写在那里。</p>
+
+      <h3 id="model-1-explains">这解释了什么</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>现象</th><th>解释</th></tr></thead>
+          <tbody>
+            <tr><td><code>kubectl</code> 能用同一套语法操作所有资源</td><td>它们都是 REST 资源，动词一致</td></tr>
+            <tr><td><code>kubectl api-resources</code> 能列出所有类型</td><td>类型本身就是 API 的一部分</td></tr>
+            <tr><td>CRD 能无缝扩展 K8s</td><td>只是往 API 里注册一种新资源，其余机制自动复用</td></tr>
+            <tr><td>一切都可以用 YAML 描述和版本管理</td><td>因为一切都是数据</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>最后一条很重要，它意味着 <strong>K8s 集群的完整状态可以被 Git 管理</strong>——这就是 GitOps 的全部前提。</p>
+
+      <hr class="sep">
+
+      <!-- ==================== 模型二 ==================== -->
+      <h2 id="model-2">模型二：声明式 + 控制循环</h2>
       <p>这是 K8s 的灵魂。</p>
 
       <h3 id="imperative-vs-declarative">命令式 vs 声明式</h3>
@@ -156,7 +205,7 @@ spec:
         <p>Deployment 和 Pod 之间的执行层：Deployment 说「要 3 个」，ReplicaSet 负责让实际数量始终是 3。先记住它存在即可（<a href="05-workloads.html">05 · 工作负载</a> 细说）。</p>
       </div>
 
-      <h3 id="model-1-explains">这解释了什么</h3>
+      <h3 id="model-2-explains">这解释了什么</h3>
       <p>一旦接受这个模型，很多现象就不需要单独记忆了：</p>
       <div class="table-wrap">
         <table>
@@ -181,55 +230,6 @@ spec:
         <p>控制循环是<strong>持续逼近</strong>而非一次性完成的。你 <code>kubectl apply</code> 一个 YAML，命令返回成功只代表「API Server 收下了这份期望状态」，<strong>不代表它已经生效</strong>。中间要经历调度、拉镜像、启动容器等一系列异步过程。</p>
         <p>这也是为什么 K8s 里到处是「等待就绪」的机制（比如探针），以及为什么 <code>apply</code> 之后立刻查状态，常常看到的不是最终结果。</p>
       </div>
-
-      <hr class="sep">
-
-      <!-- ==================== 模型二 ==================== -->
-      <h2 id="model-2">模型二：一切皆资源</h2>
-      <p>K8s 可以被理解为：<strong>一个分布式的键值存储，加上一群不断调谐它的控制器。</strong></p>
-      <p>所有东西——Pod、Service、Node、乃至权限规则——都被抽象成<strong>资源（Resource）</strong>，也叫 <strong>API 对象（API Object）</strong>，通过统一的 REST API 读写。</p>
-
-      <h3 id="unified-skeleton">统一的骨架</h3>
-      <p>几乎每个 K8s 对象都长这样：</p>
-      <div class="code-block" data-lang="yaml" data-file="deployment.yaml">
-<pre><code>apiVersion: apps/v1      # 属于哪个 API 组、哪个版本
-kind: Deployment         # 是什么类型
-metadata:                # 元信息：名字、命名空间、标签……
-  name: web
-  namespace: default
-  labels:
-    app: web
-spec:                    # ★ 期望状态：你想让它变成什么样（你写）
-  replicas: 3
-status:                  # ★ 实际状态：它现在实际是什么样（K8s 写）
-  readyReplicas: 2</code></pre>
-      </div>
-
-      <div class="callout note">
-        <div class="callout-title">spec 与 status 的分离是理解 K8s 的关键</div>
-        <ul>
-          <li><code>spec</code> 由<strong>你</strong>（或 Helm、控制器）写入，描述期望</li>
-          <li><code>status</code> 由 <strong>K8s 组件</strong>写入，描述现实</li>
-          <li>控制循环做的事，就是让 <code>status</code> 不断逼近 <code>spec</code></li>
-        </ul>
-        <p>回头看模型一，会发现它就是这里的机制实现。两个模型是咬合的。</p>
-      </div>
-
-      <p>📌 <strong>实用推论</strong>：排查问题时，<code>kubectl get xxx -o yaml</code> 里<strong>先看 <code>status</code></strong>。期望与现实的差距，往往直接写在那里。</p>
-
-      <h3 id="model-2-explains">这解释了什么</h3>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>现象</th><th>解释</th></tr></thead>
-          <tbody>
-            <tr><td><code>kubectl</code> 能用同一套语法操作所有资源</td><td>它们都是 REST 资源，动词一致</td></tr>
-            <tr><td><code>kubectl api-resources</code> 能列出所有类型</td><td>类型本身就是 API 的一部分</td></tr>
-            <tr><td>CRD 能无缝扩展 K8s</td><td>只是往 API 里注册一种新资源，其余机制自动复用</td></tr>
-            <tr><td>一切都可以用 YAML 描述和版本管理</td><td>因为一切都是数据</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>最后一条很重要，它意味着 <strong>K8s 集群的完整状态可以被 Git 管理</strong>——这就是 GitOps 的全部前提。</p>
 
       <hr class="sep">
 
@@ -512,8 +512,8 @@ K8C.Diagram.mount('#fig-hub', {
 K8C.Diagram.mount('#fig-mesh', {
   width: 760, height: 420,
   nodes: [
-    { id:'m2', x:380, y:60,  w:230, h:66, label:'模型二 · 一切皆资源', sub:'数据模型', color:'accent' },
-    { id:'m1', x:160, y:205, w:240, h:66, label:'模型一 · 声明式+控制循环', sub:'行为方式', color:'accent' },
+    { id:'m2', x:380, y:60,  w:230, h:66, label:'模型一 · 一切皆资源', sub:'数据模型', color:'accent' },
+    { id:'m1', x:160, y:205, w:240, h:66, label:'模型二 · 声明式+控制循环', sub:'行为方式', color:'accent' },
     { id:'m3', x:600, y:205, w:230, h:66, label:'模型三 · 标签解耦', sub:'组织方式', color:'accent' },
     { id:'m4', x:380, y:350, w:240, h:66, label:'模型四 · 中心辐射架构', sub:'协作方式', color:'accent' }
   ],

@@ -82,7 +82,7 @@
       <!-- ==================== 出发前 ==================== -->
       <h2 id="before">出发之前：你提交的到底是什么</h2>
       <p><code>kubectl apply -f deployment.yaml</code> 时，kubectl 做的事很简单：读 YAML，把它转换成一次对 API Server 的 <strong>REST 请求</strong>。</p>
-      <p>YAML 只是序列化格式。真正被提交的是一个 <strong>API 对象</strong>（第 01 章模型二）：带 <code>apiVersion / kind / metadata / spec</code> 的结构化数据。kubectl 本身不理解调度、不理解容器——它只是个 HTTP 客户端。</p>
+      <p>YAML 只是序列化格式。真正被提交的是一个 <strong>API 对象</strong>（第 01 章模型一）：带 <code>apiVersion / kind / metadata / spec</code> 的结构化数据。kubectl 本身不理解调度、不理解容器——它只是个 HTTP 客户端。</p>
       <div class="callout note">
         <div class="callout-title">顺带解开一个常见困惑</div>
         <p><code>apply</code> 与 <code>create</code> 的区别不在「格式」而在语义：<code>create</code> 是「新建这个对象」，已存在就报错；<code>apply</code> 是「让集群状态等于这份声明」，存在则更新。后者才是声明式的用法，也是 GitOps 的基础动作。</p>
