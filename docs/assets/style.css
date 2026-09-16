@@ -198,6 +198,7 @@ a:hover { text-decoration: underline; }
   background: var(--accent-soft);
 }
 .icon-btn svg { width: 17px; height: 17px; }
+a.icon-btn { text-decoration: none; }
 
 /* 侧栏开关（窄屏才显示） */
 #navToggle { display: none; }
